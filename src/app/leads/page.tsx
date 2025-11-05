@@ -28,9 +28,9 @@ export default function CRMHome() {
     handleAssign,
   } = useLeads();
 
-  // 🔒 Validar cookie en el servidor vía fetch
+  // 🔒 Validar cookie en el servidor vía fetch al endpoint /api/auth/verify
   useEffect(() => {
-    fetch("/api/auth/validate")
+    fetch("/api/auth/verify")
       .then(res => {
         if (!res.ok) {
           router.push("/login"); // redirige si no hay cookie válida
@@ -41,7 +41,12 @@ export default function CRMHome() {
       .catch(() => router.push("/login"));
   }, [router]);
 
-  if (loading) return <div className="flex justify-center items-center h-screen text-black">Cargando...</div>;
+  if (loading)
+    return (
+      <div className="flex justify-center items-center h-screen text-black">
+        Cargando...
+      </div>
+    );
 
   return (
     <div className="flex h-screen bg-slate-200 text-white">

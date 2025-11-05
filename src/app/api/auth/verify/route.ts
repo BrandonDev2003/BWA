@@ -1,4 +1,4 @@
-// src/app/api/auth/validate/route.ts
+// src/app/api/auth/verify/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
 
