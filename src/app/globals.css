@@ -1,0 +1,54 @@
+@import "tailwindcss";
+
+/* 🎨 Variables iniciales */
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+
+  /* Variables del tema controladas por Header */
+  --app-background: linear-gradient(135deg, #111827 0%, #000000 100%);
+  --app-text-color: #ffffff;
+  --app-card-bg: rgba(31, 41, 55, 0.6);
+}
+
+/* 🌙 Oscuro automático si no hay tema */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+/* 🎨 Conexión con Tailwind */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+/* 🌍 🔥 Fondo dinámico principal */
+html,
+body,
+#__next {
+  min-height: 100%;
+  background: var(--app-background); /* 👈 ESTA LÍNEA ES CLAVE */
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  background-size: cover;
+  color: var(--app-text-color); /* 👈 Y ESTA TAMBIÉN */
+  transition: background 0.6s ease, color 0.6s ease;
+  font-family: var(--font-geist-sans), Arial, sans-serif;
+}
+
+/* 🌫️ Tarjetas, headers, sidebars */
+.bg-card {
+  background: var(--app-card-bg);
+  backdrop-filter: saturate(140%) blur(6px);
+  transition: background 0.6s ease;
+}
+
+/* 🔤 Heredar color de texto */
+.text-inherit {
+  color: inherit;
+}
