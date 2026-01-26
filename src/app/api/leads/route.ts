@@ -19,11 +19,11 @@ export async function GET(req: NextRequest) {
   try {
     const token = getToken(req);
     if (!token)
-      return NextResponse.json({ error: "Token faltante" }, { status: 401 });
+      return NextResponse.json({ ok: false, error: "Token faltante" }, { status: 401 });
 
     const user = verifyToken(token);
     if (!user)
-      return NextResponse.json({ error: "Token inválido o expirado" }, { status: 403 });
+      return NextResponse.json({ ok: false, error: "Token inválido o expirado" }, { status: 403 });
 
     const estado = req.nextUrl.searchParams.get("estado");
 
@@ -62,11 +62,16 @@ export async function GET(req: NextRequest) {
     sql += " ORDER BY leads.id ASC";
 
     const result = await query(sql, params);
-    return NextResponse.json({ ok: true, leads: result.rows });
+
+    // 🔥 FIX IMPORTANTE
+    return NextResponse.json({
+      ok: true,
+      leads: Array.isArray(result.rows) ? result.rows : []
+    });
   } catch (error: any) {
     console.error("Error en GET /api/leads:", error);
     return NextResponse.json(
-      { error: error.message || "Error interno del servidor" },
+      { ok: false, error: error.message || "Error interno del servidor" },
       { status: 500 }
     );
   }
@@ -79,16 +84,16 @@ export async function POST(req: NextRequest) {
   try {
     const token = getToken(req);
     if (!token)
-      return NextResponse.json({ error: "Token faltante" }, { status: 401 });
+      return NextResponse.json({ ok: false, error: "Token faltante" }, { status: 401 });
 
     const user = verifyToken(token);
     if (!user)
-      return NextResponse.json({ error: "Token inválido o expirado" }, { status: 403 });
+      return NextResponse.json({ ok: false, error: "Token inválido o expirado" }, { status: 403 });
 
     const data = await req.json();
     const errors = validateLead(data);
 
-    if (errors.length > 0) return NextResponse.json({ errors }, { status: 400 });
+    if (errors.length > 0) return NextResponse.json({ ok: false, errors }, { status: 400 });
 
     const asignadoA = user.rol === "admin" ? data.asignado_a || null : user.id;
 
@@ -118,7 +123,7 @@ export async function POST(req: NextRequest) {
   } catch (error: any) {
     console.error("Error en POST /api/leads:", error);
     return NextResponse.json(
-      { error: error.message || "Error interno del servidor" },
+      { ok: false, error: error.message || "Error interno del servidor" },
       { status: 500 }
     );
   }
@@ -131,19 +136,19 @@ export async function PUT(req: NextRequest) {
   try {
     const token = getToken(req);
     if (!token)
-      return NextResponse.json({ error: "Token faltante" }, { status: 401 });
+      return NextResponse.json({ ok: false, error: "Token faltante" }, { status: 401 });
 
     const user = verifyToken(token);
     if (!user)
-      return NextResponse.json({ error: "Token inválido o expirado" }, { status: 403 });
+      return NextResponse.json({ ok: false, error: "Token inválido o expirado" }, { status: 403 });
 
     const leadId = req.nextUrl.searchParams.get("id");
     if (!leadId)
-      return NextResponse.json({ error: "ID del lead requerido" }, { status: 400 });
+      return NextResponse.json({ ok: false, error: "ID del lead requerido" }, { status: 400 });
 
     const idNumber = Number(leadId);
     if (isNaN(idNumber))
-      return NextResponse.json({ error: "ID inválido" }, { status: 400 });
+      return NextResponse.json({ ok: false, error: "ID inválido" }, { status: 400 });
 
     const data = await req.json();
 
@@ -162,35 +167,26 @@ export async function PUT(req: NextRequest) {
       comentario,
     } = data;
 
-    // 🔸 Validaciones básicas
     if (correo && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo))
-      return NextResponse.json({ error: "Correo inválido" }, { status: 400 });
+      return NextResponse.json({ ok: false, error: "Correo inválido" }, { status: 400 });
 
     if (telefono && !/^[0-9]{7,15}$/.test(telefono))
-      return NextResponse.json({ error: "Teléfono inválido" }, { status: 400 });
+      return NextResponse.json({ ok: false, error: "Teléfono inválido" }, { status: 400 });
 
-    // 🔸 Solo admin/manager puede reasignar
     let asignado_a_val: number | null = null;
     if ((user.rol === "admin" || user.rol === "manager") && asignado_a) {
       const checkUser = await query("SELECT id, rol FROM users WHERE id = $1", [
         Number(asignado_a),
       ]);
       if (checkUser.rows.length === 0)
-        return NextResponse.json(
-          { error: "Usuario destino no encontrado" },
-          { status: 404 }
-        );
+        return NextResponse.json({ ok: false, error: "Usuario destino no encontrado" }, { status: 404 });
 
       if (checkUser.rows[0].rol !== "asesor")
-        return NextResponse.json(
-          { error: "Solo se puede asignar a asesores" },
-          { status: 400 }
-        );
+        return NextResponse.json({ ok: false, error: "Solo se puede asignar a asesores" }, { status: 400 });
 
       asignado_a_val = Number(asignado_a);
     }
 
-    // 🔸 Actualizar el lead
     const result = await query(
       `UPDATE leads SET
         nombre = COALESCE($1, nombre),
@@ -224,11 +220,10 @@ export async function PUT(req: NextRequest) {
     );
 
     if (result.rowCount === 0)
-      return NextResponse.json({ error: "Lead no encontrado" }, { status: 404 });
+      return NextResponse.json({ ok: false, error: "Lead no encontrado" }, { status: 404 });
 
     const updatedLead = result.rows[0];
 
-    // 🔸 Guardar comentario (nota interna)
     if (comentario) {
       await query(
         `INSERT INTO notes (lead_id, autor_id, contenido, fecha)
@@ -237,7 +232,6 @@ export async function PUT(req: NextRequest) {
       );
     }
 
-    // 🔸 Registrar nota automática si se reasigna
     if (asignado_a_val) {
       await query(
         `INSERT INTO notes (lead_id, autor_id, contenido, fecha)
@@ -250,7 +244,7 @@ export async function PUT(req: NextRequest) {
   } catch (error: any) {
     console.error("Error en PUT /api/leads:", error);
     return NextResponse.json(
-      { error: error.message || "Error interno del servidor" },
+      { ok: false, error: error.message || "Error interno del servidor" },
       { status: 500 }
     );
   }

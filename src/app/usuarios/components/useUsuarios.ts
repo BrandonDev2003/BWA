@@ -1,69 +1,108 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useEffect, useCallback } from "react";
+
+export interface User {
+  id: number;
+  nombre: string;
+  correo: string;
+  rol: string;
+  cedula?: string;
+  puede_ver_todo?: boolean;
+  [key: string]: any;
+}
 
 export function useUsuarios() {
-  const [usuarios, setUsuarios] = useState<any[]>([]);
+  const [usuarios, setUsuarios] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // ✅ Función para cargar usuarios desde la API
-  const cargarUsuarios = async () => {
-    const token = localStorage.getItem("token");
-
-    if (!token) {
-      console.warn("⚠️ No hay token, no se pueden cargar usuarios.");
-      return;
-    }
+  // -------------------------------------------------
+  // CARGAR USUARIOS (USA COOKIE TOKEN AUTOMÁTICAMENTE)
+  // -------------------------------------------------
+  const cargarUsuarios = useCallback(async () => {
+    setLoading(true);
 
     try {
-      const res = await fetch("/api/users", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+      const res = await fetch("/api/usuarios/listar", {
+        method: "GET",
+        credentials: "include",
       });
 
       const data = await res.json();
-      console.log("🔍 Datos de la API /api/users:", data);
 
-      const list = Array.isArray(data.users) ? data.users : [];
-      setUsuarios(list.filter((u) => u.rol === "asesor"));
+      if (!res.ok) {
+        console.error("Error cargando usuarios:", data.error);
+        return;
+      }
+
+      setUsuarios(Array.isArray(data.usuarios) ? data.usuarios : []);
     } catch (err) {
-      console.error("❌ Error al cargar usuarios:", err);
+      console.error("Error cargando usuarios:", err);
+    } finally {
+      setLoading(false);
     }
-  };
-
-  // ✅ Cargar usuarios automáticamente al montar
-  useEffect(() => {
-    cargarUsuarios();
   }, []);
 
-  // ✅ Función para agregar un nuevo usuario
-  const agregarUsuario = async ({ nombre, correo, password }: any) => {
-    const token = localStorage.getItem("token");
-    const res = await fetch("/api/users", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        nombre_completo: nombre,
-        correo,
-        cedula: "0000000000",
-        password,
-        rol: "asesor",
-        puede_ver_todo: false,
-      }),
-    });
+  // -------------------------------------------------
+  // AGREGAR USUARIO
+  // -------------------------------------------------
+  const agregarUsuario = async (usuario: Partial<User>) => {
+    try {
+      const res = await fetch("/api/usuarios/crear", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(usuario),
+      });
 
-    const data = await res.json();
+      const data = await res.json();
 
-    if (res.ok && data.user) {
-      setUsuarios((prev) => [...prev, data.user]);
-    } else {
-      console.error("❌ Error al crear usuario:", data.error);
+      if (res.ok && data.user) {
+        setUsuarios((prev) => [...prev, data.user]);
+      } else {
+        console.error("Error creando usuario:", data.error);
+      }
+    } catch (err) {
+      console.error("Error creando usuario:", err);
     }
   };
 
-  return { usuarios, agregarUsuario, cargarUsuarios, loading };
+  // -------------------------------------------------
+  // EDITAR USUARIO
+  // -------------------------------------------------
+  const editarUsuario = async (usuario: Partial<User> & { id: number }) => {
+    try {
+      const res = await fetch(`/api/usuarios/editar/${usuario.id}`, {
+        method: "PUT",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(usuario),
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.user) {
+        setUsuarios((prev) =>
+          prev.map((u) => (u.id === data.user.id ? data.user : u))
+        );
+      } else {
+        console.error("Error editando usuario:", data.error);
+      }
+    } catch (err) {
+      console.error("Error editando usuario:", err);
+    }
+  };
+
+  // -------------------------------------------------
+  // Cargar al montar
+  // -------------------------------------------------
+  useEffect(() => {
+    cargarUsuarios();
+  }, [cargarUsuarios]);
+
+  return { usuarios, loading, agregarUsuario, editarUsuario, cargarUsuarios };
 }

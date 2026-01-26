@@ -12,7 +12,9 @@ import { useLeads } from "./hooks/useLeads";
 
 export default function CRMHome() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [loading, setLoading] = useState(true); // para bloquear render hasta validar
+  const [authStatus, setAuthStatus] = useState<
+    "loading" | "authorized" | "unauthorized"
+  >("loading");
   const router = useRouter();
 
   const {
@@ -26,57 +28,104 @@ export default function CRMHome() {
     users,
     fetchUsers,
     handleAssign,
+    fetchLeads,
   } = useLeads();
 
-  // 🔒 Validar cookie en el servidor vía fetch al endpoint /api/auth/verify
   useEffect(() => {
-    fetch("/api/auth/verify")
-      .then(res => {
-        if (!res.ok) {
-          router.push("/login"); // redirige si no hay cookie válida
-        } else {
-          setLoading(false);
-        }
-      })
-      .catch(() => router.push("/login"));
-  }, [router]);
+    const verifyUser = async () => {
+      try {
+        const res = await fetch("/api/auth/verify", { cache: "no-store" });
+        const data = await res.json();
 
-  if (loading)
+        if (!data.ok) return setAuthStatus("unauthorized");
+        if (!data.user || !data.user.rol) return setAuthStatus("unauthorized");
+
+        if (data.user.rol === "admin" || data.user.rol === "Administrador") {
+          setAuthStatus("authorized");
+        } else {
+          setAuthStatus("unauthorized");
+        }
+      } catch {
+        setAuthStatus("unauthorized");
+      }
+    };
+
+    verifyUser();
+  }, []);
+
+  useEffect(() => {
+    if (authStatus === "unauthorized") router.replace("/login");
+  }, [authStatus, router]);
+
+  if (authStatus === "loading") {
     return (
-      <div className="flex justify-center items-center h-screen text-black">
-        Cargando...
+      <div className="min-h-screen grid place-items-center bg-[#0B0D10] text-white">
+        <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl px-6 py-4 shadow-2xl">
+          Validando acceso...
+        </div>
       </div>
     );
+  }
+
+  if (authStatus === "unauthorized") return null;
 
   return (
-    <div className="flex h-screen bg-slate-200 text-white">
+  <div className="min-h-screen bg-[#0B0D10] text-white">
+    {/* Fondo con “bloom” sutil como la referencia */}
+    <div className="pointer-events-none fixed inset-0">
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(255,255,255,0.06),rgba(0,0,0,0.85))]" />
+      <div className="absolute -top-40 right-[-6rem] h-[34rem] w-[34rem] rounded-full bg-emerald-500/10 blur-3xl" />
+      <div className="absolute bottom-[-10rem] left-[-8rem] h-[34rem] w-[34rem] rounded-full bg-slate-400/10 blur-3xl" />
+    </div>
+
+    {/* ✅ quitamos h-screen para no “encerrar” el scroll */}
+    <div className="relative flex min-h-screen">
       {/* Sidebar */}
       <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} />
 
-      {/* Contenido principal */}
-      <main className="flex-1 p-8 overflow-y-auto">
-        <Header onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
+      {/* Main (scroll natural) */}
+      <main className="flex-1 p-4 md:p-6">
+        {/* Header card */}
+        <div className="mb-6 rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-4 shadow-2xl">
+          <Header
+            onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+            onRefresh={fetchLeads}
+          />
+        </div>
 
-        <Filters
-          filtroEstado={filtroEstado}
-          setFiltroEstado={setFiltroEstado}
-          selectedLeads={selectedLeads}
-          onAssignClick={() => {
-            fetchUsers();
-            setShowAssignUsers(!showAssignUsers);
-          }}
-        />
+        {/* Filters card */}
+        <div className="mb-6 rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-4 shadow-2xl">
+          <Filters
+            filtroEstado={filtroEstado}
+            setFiltroEstado={setFiltroEstado}
+            selectedLeads={selectedLeads}
+            onAssignClick={() => {
+              fetchUsers();
+              setShowAssignUsers(!showAssignUsers);
+            }}
+          />
+        </div>
 
         {showAssignUsers && (
-          <AssignUsers users={users} onAssign={handleAssign} />
+          <div className="mb-6 rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-4 shadow-2xl">
+            <AssignUsers users={users} onAssign={handleAssign} />
+          </div>
         )}
 
-        <LeadTable
-          leads={leads}
-          selectedLeads={selectedLeads}
-          setSelectedLeads={setSelectedLeads}
-        />
+        {/* Table card */}
+        <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-4 shadow-2xl">
+          <LeadTable
+            leads={leads}
+            selectedLeads={selectedLeads}
+            setSelectedLeads={setSelectedLeads}
+          />
+        </div>
+
+        {/* Detalle verde */}
+        <div className="mt-6 h-px w-full bg-emerald-500/20" />
       </main>
     </div>
-  );
+  </div>
+);
+
 }

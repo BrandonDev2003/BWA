@@ -1,39 +1,25 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { verifyToken } from "@/lib/auth";
 
-export async function middleware(req: NextRequest) {
-  const { pathname } = req.nextUrl;
+export function middleware(request: NextRequest) {
+  const token = request.cookies.get("session")?.value || "";
 
-  // ✅ Permitir rutas públicas
-  if (
-    pathname.startsWith("/login") ||
-    pathname.startsWith("/api/auth") ||
-    pathname === "/"
-  ) {
-    return NextResponse.next();
+  // Rutas protegidas
+  const protectedRoutes = ["/leads", "/leadsgestion"];
+
+  const pathname = request.nextUrl.pathname;
+
+  // Si intenta entrar a una ruta protegida sin sesión
+  if (protectedRoutes.some((route) => pathname.startsWith(route))) {
+    if (!token) {
+      return NextResponse.redirect(new URL("/login", request.url));
+    }
   }
 
-  // ✅ Leer token de cookies
-  const token = req.cookies.get("token")?.value;
-
-  // 🚫 Si no hay token, redirigir al login
-  if (!token) {
-    return NextResponse.redirect(new URL("/login", req.url));
-  }
-
-  try {
-    // 🔍 Verificar token
-    verifyToken(token);
-    return NextResponse.next();
-  } catch (err) {
-    console.error("❌ Token inválido:", err);
-    // ❌ Token inválido → redirigir al login
-    return NextResponse.redirect(new URL("/login", req.url));
-  }
+  return NextResponse.next();
 }
 
-// ✅ Aplica middleware solo en rutas protegidas
+// Aquí aplicamos el middleware
 export const config = {
-  matcher: ["/home/:path*", "/admin/:path*", "/leads/:path*"], // protege tus rutas
+  matcher: ["/leads/:path*", "/leadsgestion/:path*"],
 };

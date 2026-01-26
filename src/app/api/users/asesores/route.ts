@@ -1,21 +1,27 @@
 // src/app/api/users/asesores/route.ts
-import { NextRequest, NextResponse } from "next/server";
-import { query } from "@/lib/db";
-import { verifyToken } from "@/lib/auth";
 
-export async function GET(req: NextRequest) {
+import { NextResponse } from "next/server";
+import { pool } from "@/lib/db";
+
+// 👉 AQUÍ NO EXISTE params porque "asesores" NO es un ID
+export async function GET() {
   try {
-    const token = req.cookies.get("token")?.value;
-    if (!token) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    const result = await pool.query(`
+      SELECT id, nombre, correo, cedula, rol, foto_asesor
+      FROM users
+      WHERE rol = 'asesor'
+      ORDER BY nombre ASC
+    `);
 
-    const user = verifyToken(token);
-    if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-
-    // Solo usuarios de rol 'asesor'
-    const res = await query("SELECT id, nombre, correo, rol FROM users WHERE rol = 'asesor'");
-    return NextResponse.json({ users: res.rows || [] });
+    return NextResponse.json({
+      ok: true,
+      users: result.rows
+    });
   } catch (err) {
     console.error("Error al obtener asesores:", err);
-    return NextResponse.json({ error: "Error al obtener asesores" }, { status: 500 });
+    return NextResponse.json(
+      { ok: false, error: "Error interno al obtener asesores" },
+      { status: 500 }
+    );
   }
 }

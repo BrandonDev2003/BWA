@@ -1,231 +1,293 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import AssignUsers from "./AssignUsers";
-
-interface Lead {
-  id: number;
-  nombre: string;
-  correo: string;
-  telefono: string;
-  origen: string;
-  estado?: "pendiente" | "contactado" | "cerrado" | string;
-  asignado_a?: number;
-}
-
-interface FiltersProps {
-  filtroEstado: string;
-  setFiltroEstado: (estado: string) => void;
-  selectedLeads: number[];
-  onAssignClick: () => void;
-}
-
-const Filters: React.FC<FiltersProps> = ({
-  filtroEstado,
-  setFiltroEstado,
-  selectedLeads,
-  onAssignClick,
-}) => {
-  const estados = ["todos", "pendiente", "contactado", "cerrado"];
-  return (
-    <div className="flex flex-wrap gap-3 mb-8 items-center">
-      {estados.map((estado) => (
-        <button
-          key={estado}
-          className={`px-4 py-2 rounded-full font-medium transition ${
-            filtroEstado === estado
-              ? "bg-[#C0D0EF] text-white shadow-lg"
-              : "bg-gray-800 text-gray-300 hover:bg-gray-700"
-          }`}
-          onClick={() => setFiltroEstado(estado)}
-        >
-          {estado.charAt(0).toUpperCase() + estado.slice(1)}
-        </button>
-      ))}
-
-      {selectedLeads.length > 0 && (
-        <button
-          className="ml-auto px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow"
-          onClick={onAssignClick}
-        >
-          Asignar a usuario
-        </button>
-      )}
-    </div>
-  );
-};
+import { RefreshCcw } from "lucide-react";
+import { useLeads } from "../hooks/useLeads";
 
 export default function LeadTable() {
-  const [leads, setLeads] = useState<Lead[]>([]);
-  const [selectedLeads, setSelectedLeads] = useState<number[]>([]);
-  const [isAssignOpen, setIsAssignOpen] = useState(false);
-  const [filtroEstado, setFiltroEstado] = useState("todos");
+  const {
+    leads,
+    fetchLeads,
+    filtroEstado,
+    setFiltroEstado,
+    selectedLeads,
+    setSelectedLeads,
+    showAssignUsers,
+    setShowAssignUsers,
+    users,
+    fetchUsers,
+    handleAssign,
+  } = useLeads();
 
-  // 🔹 Cargar leads y normalizar estado
-  useEffect(() => {
-    fetch("/api/leads", { credentials: "include" })
-      .then(res => res.json())
-      .then(data => {
-        const raw = Array.isArray(data) ? data : data?.leads || [];
-        const normalized = raw.map((l: any) => ({
-          ...l,
-          estado: l.estado?.toLowerCase() || "pendiente",
-        }));
-        setLeads(normalized);
-      })
-      .catch(console.error);
-  }, []);
+  // 🔹 NORMALIZAR ESTADO: "nuevo" → "pendiente"
+  const leadsNormalizados = leads.map((l) => ({
+    ...l,
+    estado: l.estado === "Nuevo" ? "pendiente" : l.estado,
+  }));
 
-  // 🔹 Filtrado
-  const leadsFiltrados = leads.filter(l =>
+  // 🔹 Filtrar por estado ya normalizado
+  const leadsFiltrados = leadsNormalizados.filter((l) =>
     filtroEstado === "todos" ? true : l.estado === filtroEstado
   );
 
-  // 🔹 Selección individual y global
-  const toggleSelect = (leadId: number) => {
-    setSelectedLeads(prev =>
-      prev.includes(leadId) ? prev.filter(id => id !== leadId) : [...prev, leadId]
+  // Selección individual
+  const toggleSelect = (id: number) => {
+    setSelectedLeads((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     );
   };
 
+  // Selección global
   const toggleSelectAll = () => {
-    if (!leadsFiltrados.length) return;
-    const allSelected = leadsFiltrados.every(l => selectedLeads.includes(l.id));
-    setSelectedLeads(prev =>
-      allSelected
-        ? prev.filter(id => !leadsFiltrados.some(l => l.id === id))
-        : Array.from(new Set([...prev, ...leadsFiltrados.map(l => l.id)]))
-    );
+    const allSelected =
+      leadsFiltrados.length > 0 &&
+      leadsFiltrados.every((l) => selectedLeads.includes(l.id));
+
+    setSelectedLeads(allSelected ? [] : leadsFiltrados.map((l) => l.id));
   };
 
-  // 🔹 Modal de asignación
-  const handleAssignClick = () => {
-    if (selectedLeads.length > 0) setIsAssignOpen(true);
-  };
+  const isAllChecked =
+    leadsFiltrados.length > 0 &&
+    leadsFiltrados.every((l) => selectedLeads.includes(l.id));
 
-  const handleAssignUser = async (userId: number) => {
-    if (!selectedLeads.length) return;
-    try {
-      const res = await fetch("/api/leads/assigns", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ leadIds: selectedLeads, asesorId: userId }),
-      });
-      if (!res.ok) throw new Error("Error asignando usuario");
-
-      setLeads(prev =>
-        prev.map(l =>
-          selectedLeads.includes(l.id) ? { ...l, asignado_a: userId } : l
-        )
-      );
-      setSelectedLeads([]);
-      setIsAssignOpen(false);
-    } catch (err) {
-      console.error(err);
-    }
-  };
+  const estados = ["todos", "pendiente", "contactado", "cerrado"] as const;
 
   return (
     <div>
+      {/* 🔹 Top bar: refresh + contador */}
+      <div className="flex items-center justify-between gap-3 mb-5">
+        <button
+          onClick={fetchLeads}
+          className="
+            flex items-center gap-2
+            rounded-2xl
+            border border-white/10
+            bg-white/5
+            backdrop-blur-xl
+            px-4 py-2.5
+            text-sm font-semibold text-white/85
+            hover:bg-white/10
+            transition
+            shadow-2xl
+          "
+        >
+          <RefreshCcw className="w-4 h-4 text-white/80" />
+          Refrescar tabla
+        </button>
+
+        <div className="text-sm text-white/60">
+          Total:{" "}
+          <span className="text-white/85 font-semibold">
+            {leadsFiltrados.length}
+          </span>
+          {selectedLeads.length > 0 && (
+            <>
+              {" "}
+              • Seleccionados:{" "}
+              <span className="text-emerald-300 font-semibold">
+                {selectedLeads.length}
+              </span>
+            </>
+          )}
+        </div>
+      </div>
+
       {/* 🔹 Filtros */}
-      <Filters
-        filtroEstado={filtroEstado}
-        setFiltroEstado={setFiltroEstado}
-        selectedLeads={selectedLeads}
-        onAssignClick={handleAssignClick}
-      />
+      <div className="flex flex-wrap gap-2 mb-5 items-center">
+        {estados.map((estado) => {
+          const active = filtroEstado === estado;
+          return (
+            <button
+              key={estado}
+              onClick={() => setFiltroEstado(estado)}
+              className={[
+                "px-4 py-2 rounded-full text-sm font-semibold transition",
+                "border",
+                active
+                  ? "bg-emerald-500/15 border-emerald-400/20 text-white"
+                  : "bg-white/5 border-white/10 text-white/70 hover:bg-white/10 hover:text-white",
+              ].join(" ")}
+            >
+              {estado}
+            </button>
+          );
+        })}
+
+        {selectedLeads.length > 0 && (
+          <button
+            onClick={() => {
+              fetchUsers();
+              setShowAssignUsers(true);
+            }}
+            className="
+              ml-auto
+              px-4 py-2 rounded-full
+              text-sm font-semibold
+              border border-emerald-400/20
+              bg-emerald-500/15
+              text-white/90
+              hover:bg-emerald-500/25 hover:border-emerald-400/30
+              transition
+              shadow-2xl
+            "
+          >
+            Asignar a usuario
+          </button>
+        )}
+      </div>
 
       {/* 🔹 Tabla */}
       <motion.div
-        className="bg-[#C2C6CE] rounded-2xl border border-gray-800 overflow-hidden shadow-lg"
+        className="
+          rounded-3xl
+          border border-white/10
+          bg-white/5
+          backdrop-blur-2xl
+          shadow-2xl
+          overflow-hidden
+        "
         layout
       >
-        <table className="w-full text-left text-sm">
-          <thead className="bg-black text-gray-300">
-            <tr>
-              <th className="p-3 w-10 text-center">
-                <input
-                  type="checkbox"
-                  checked={
-                    leadsFiltrados.length > 0 &&
-                    leadsFiltrados.every(l => selectedLeads.includes(l.id))
-                  }
-                  onChange={toggleSelectAll}
-                  className="accent-green-800 w-4 h-4 cursor-pointer"
-                />
-              </th>
-              <th className="p-3">Nombre</th>
-              <th className="p-3">Correo</th>
-              <th className="p-3">Teléfono</th>
-              <th className="p-3">Origen</th>
-              <th className="p-3">Estado</th>
-              <th className="p-3">Asignado a</th>
-              <th className="p-3 text-center">Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            <AnimatePresence>
-              {leadsFiltrados.map(lead => (
-                <motion.tr
-                  key={lead.id}
-                  layout
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 10 }}
-                  className="border-t border-gray-800 hover:bg-gray-800/20"
-                >
-                  <td className="p-3 text-center">
-                    <input
-                      type="checkbox"
-                      checked={selectedLeads.includes(lead.id)}
-                      onChange={e => {
-                        e.stopPropagation();
-                        toggleSelect(lead.id);
-                      }}
-                      className="accent-green-500 w-4 h-4 cursor-pointer"
-                    />
+        {/* header interno para darle contraste */}
+        <div className="h-px w-full bg-emerald-500/15" />
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm min-w-[980px]">
+            <thead className="bg-black/35 text-white/70">
+              <tr className="border-b border-white/10">
+                <th className="p-3 w-10 text-center">
+                  <input
+                    type="checkbox"
+                    checked={isAllChecked}
+                    onChange={toggleSelectAll}
+                    className="accent-emerald-400 w-4 h-4 cursor-pointer"
+                  />
+                </th>
+                <th className="p-3 text-xs font-semibold tracking-wide uppercase whitespace-nowrap">
+                  Nombre
+                </th>
+                <th className="p-3 text-xs font-semibold tracking-wide uppercase whitespace-nowrap">
+                  Correo
+                </th>
+                <th className="p-3 text-xs font-semibold tracking-wide uppercase whitespace-nowrap">
+                  Teléfono
+                </th>
+                <th className="p-3 text-xs font-semibold tracking-wide uppercase whitespace-nowrap">
+                  Origen
+                </th>
+                <th className="p-3 text-xs font-semibold tracking-wide uppercase whitespace-nowrap">
+                  Estado
+                </th>
+                <th className="p-3 text-xs font-semibold tracking-wide uppercase whitespace-nowrap">
+                  Asignado a
+                </th>
+                <th className="p-3 text-xs font-semibold tracking-wide uppercase whitespace-nowrap text-center">
+                  Acciones
+                </th>
+              </tr>
+            </thead>
+
+            <tbody>
+              <AnimatePresence>
+                {leadsFiltrados.map((lead) => (
+                  <motion.tr
+                    key={lead.id}
+                    layout
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 10 }}
+                    className="
+                      border-t border-white/10
+                      hover:bg-white/5
+                      transition-colors
+                    "
+                  >
+                    <td className="p-3 text-center">
+                      <input
+                        type="checkbox"
+                        checked={selectedLeads.includes(lead.id)}
+                        onChange={() => toggleSelect(lead.id)}
+                        className="accent-emerald-400 w-4 h-4 cursor-pointer"
+                      />
+                    </td>
+
+                    <td className="p-3 text-white/85 font-medium">
+                      {lead.nombre}
+                    </td>
+                    <td className="p-3 text-white/70">{lead.correo}</td>
+                    <td className="p-3 text-white/70">{lead.telefono}</td>
+                    <td className="p-3 capitalize text-white/70">
+                      {lead.origen}
+                    </td>
+
+                    <td className="p-3">
+                      <span
+                        className={[
+                          "px-3 py-1 rounded-full text-xs font-semibold border",
+                          lead.estado === "cerrado"
+                            ? "bg-emerald-500/15 text-emerald-200 border-emerald-400/20"
+                            : lead.estado === "contactado"
+                            ? "bg-amber-500/15 text-amber-200 border-amber-400/20"
+                            : "bg-white/5 text-white/70 border-white/10",
+                        ].join(" ")}
+                      >
+                        {lead.estado}
+                      </span>
+                    </td>
+
+                    <td className="p-3 text-white/70">
+                      {lead.asignado_a || "Sin asignar"}
+                    </td>
+
+                    <td className="p-3 text-center">
+                      <button
+                        onClick={() =>
+                          (window.location.href = `/leads/${lead.id}`)
+                        }
+                        className="
+                          px-3 py-1.5
+                          rounded-xl
+                          text-xs font-semibold
+                          border border-white/10
+                          bg-white/5
+                          text-white/80
+                          hover:bg-white/10 hover:text-white
+                          transition
+                        "
+                      >
+                        Ver caso
+                      </button>
+                    </td>
+                  </motion.tr>
+                ))}
+              </AnimatePresence>
+
+              {leadsFiltrados.length === 0 && (
+                <tr>
+                  <td
+                    colSpan={8}
+                    className="p-10 text-center text-white/50"
+                  >
+                    No hay leads para mostrar con este filtro.
                   </td>
-                  <td className="p-3 text-black font-medium">{lead.nombre}</td>
-                  <td className="p-3 text-black">{lead.correo}</td>
-                  <td className="p-3 text-black">{lead.telefono}</td>
-                  <td className="p-3 capitalize text-black">{lead.origen}</td>
-                  <td className="p-3">
-                    <span
-                      className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                        lead.estado === "cerrado"
-                          ? "bg-green-500/20 text-green-700"
-                          : lead.estado === "contactado"
-                          ? "bg-yellow-500/20 text-yellow-600"
-                          : "bg-gray-700/40 text-gray-800"
-                      }`}
-                    >
-                      {lead.estado || "pendiente"}
-                    </span>
-                  </td>
-                  <td className="p-3 text-black">{lead.asignado_a || "Sin asignar"}</td>
-                  <td className="p-3 text-center">
-                    <button
-                      onClick={() => (window.location.href = `/leads/${lead.id}`)}
-                      className="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white text-xs rounded-lg font-medium"
-                    >
-                      Ver caso
-                    </button>
-                  </td>
-                </motion.tr>
-              ))}
-            </AnimatePresence>
-          </tbody>
-        </table>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* footer line */}
+        <div className="h-px w-full bg-emerald-500/15" />
       </motion.div>
 
       {/* 🔹 Modal Asignar */}
       <AssignUsers
-        key={selectedLeads.join("-")}
-        isOpen={isAssignOpen}
-        onAssign={handleAssignUser}
-        onClose={() => setIsAssignOpen(false)}
+        isOpen={showAssignUsers}
+        onAssign={handleAssign}
+        onClose={() => setShowAssignUsers(false)}
+        users={users}
       />
     </div>
   );

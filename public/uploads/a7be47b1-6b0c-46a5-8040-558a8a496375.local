@@ -1,0 +1,11 @@
+EMAIL_USER=adlanmon@gmail.com
+EMAIL_PASS=jitrkpqqwvzacfxh
+EMAIL_TO=belencalvachi03@gmail.com
+DATABASE_URL=postgresql://postgres:211535@localhost:5432/gestion_leads
+JWT_SECRET=mi_clave_segura_unica
+JWT_EXPIRES_IN=7d
+BCRYPT_SALT_ROUNDS=10
+SMTP_USER=adlanmon@gmail.com
+SMTP_PASS=jitrkpqqwvzacfxh
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=465

@@ -1,53 +1,129 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { generarPassword } from "@/lib/utils";
 
-export default function AddUserModal({ onClose, onSave }: any) {
-  const [nombre, setNombre] = useState("");
-  const [correo, setCorreo] = useState("");
-  const [password, setPassword] = useState(generarPassword());
+interface UsuarioModalProps {
+  onClose: () => void;
+  onSave: (usuario: any) => void;
+  user?: any; // Para editar
+}
+
+export default function UsuarioModal({ onClose, onSave, user }: UsuarioModalProps) {
+  const [form, setForm] = useState({
+    nombre: "",
+    correo: "",
+    cedula: "",
+    rol: "asesor",
+    password: generarPassword(),
+    // Otros campos que quieras agregar:
+    telefono: "",
+    direccion: "",
+    notas: "",
+  });
+
+  // Si recibimos user, precargamos datos para editar
+  useEffect(() => {
+    if (user) {
+      setForm({
+        ...form,
+        ...user,
+        password: user.password || generarPassword(),
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
+  const handleChange = (key: string, value: any) => {
+    setForm((prev) => ({ ...prev, [key]: value }));
+  };
 
   const handleSubmit = async () => {
-    await onSave({ nombre, correo, password });
+    await onSave(form);
   };
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
-      <div className="bg-gray-900 border border-gray-700 rounded-2xl p-8 w-[400px]">
-        <h2 className="text-xl font-bold mb-4 text-center">Agregar Asesor</h2>
+      <div className="bg-gray-900 border border-gray-700 rounded-2xl p-8 w-[480px] max-h-[90vh] overflow-y-auto">
+        <h2 className="text-xl font-bold mb-4 text-center">
+          {user ? "Editar Usuario" : "Agregar Usuario"}
+        </h2>
 
+        {/* Nombre */}
         <label className="block mb-2 text-sm text-gray-300">Nombre</label>
         <input
           className="w-full p-2 rounded bg-gray-800 border border-gray-700 text-white mb-4"
-          value={nombre}
-          onChange={(e) => setNombre(e.target.value)}
+          value={form.nombre}
+          onChange={(e) => handleChange("nombre", e.target.value)}
         />
 
+        {/* Correo */}
         <label className="block mb-2 text-sm text-gray-300">Correo</label>
         <input
           className="w-full p-2 rounded bg-gray-800 border border-gray-700 text-white mb-4"
-          value={correo}
-          onChange={(e) => setCorreo(e.target.value)}
+          value={form.correo}
+          onChange={(e) => handleChange("correo", e.target.value)}
         />
 
-        <label className="block mb-2 text-sm text-gray-300">
-          Contraseña generada
-        </label>
+        {/* Cédula */}
+        <label className="block mb-2 text-sm text-gray-300">Cédula</label>
+        <input
+          className="w-full p-2 rounded bg-gray-800 border border-gray-700 text-white mb-4"
+          value={form.cedula}
+          onChange={(e) => handleChange("cedula", e.target.value)}
+        />
+
+        {/* Rol */}
+        <label className="block mb-2 text-sm text-gray-300">Rol</label>
+        <select
+          className="w-full p-2 rounded bg-gray-800 border border-gray-700 text-white mb-4"
+          value={form.rol}
+          onChange={(e) => handleChange("rol", e.target.value)}
+        >
+          <option value="asesor">Asesor</option>
+          <option value="admin">Administrador</option>
+        </select>
+
+        {/* Password */}
+        <label className="block mb-2 text-sm text-gray-300">Contraseña</label>
         <div className="flex mb-4">
           <input
             className="w-full p-2 rounded-l bg-gray-800 border border-gray-700 text-white"
-            value={password}
+            value={form.password}
             readOnly
           />
           <button
-            onClick={() => setPassword(generarPassword())}
+            type="button"
+            onClick={() => handleChange("password", generarPassword())}
             className="px-3 bg-purple-600 rounded-r hover:bg-purple-700"
           >
             🔄
           </button>
         </div>
 
+        {/* Campos adicionales */}
+        <label className="block mb-2 text-sm text-gray-300">Teléfono</label>
+        <input
+          className="w-full p-2 rounded bg-gray-800 border border-gray-700 text-white mb-4"
+          value={form.telefono}
+          onChange={(e) => handleChange("telefono", e.target.value)}
+        />
+
+        <label className="block mb-2 text-sm text-gray-300">Dirección</label>
+        <input
+          className="w-full p-2 rounded bg-gray-800 border border-gray-700 text-white mb-4"
+          value={form.direccion}
+          onChange={(e) => handleChange("direccion", e.target.value)}
+        />
+
+        <label className="block mb-2 text-sm text-gray-300">Notas</label>
+        <textarea
+          className="w-full p-2 rounded bg-gray-800 border border-gray-700 text-white mb-4"
+          value={form.notas}
+          onChange={(e) => handleChange("notas", e.target.value)}
+        />
+
+        {/* Botones */}
         <div className="flex justify-between mt-6">
           <button
             onClick={onClose}

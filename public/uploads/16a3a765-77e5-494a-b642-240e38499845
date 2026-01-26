@@ -1,0 +1,9 @@
+DATABASE_URL=postgresql://postgres:211535@localhost:5432/postgres
+JWT_SECRET=mi_clave_segura_unica
+JWT_EXPIRES_IN=7d
+BCRYPT_SALT_ROUNDS=10
+SMTP_USER=adlanmon@gmail.com
+SMTP_PASS=jitrkpqqwvzacfxh
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=465
+NEXT_PUBLIC_URL=http://localhost:3000

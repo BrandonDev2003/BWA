@@ -38,7 +38,7 @@
     ".next\\dev/types/**/*.ts",
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts"
-  ],
+, "src/lib/prisma.js", "src/lib/prisma.js", "server.mjs", "src/lib/socket.js"  ],
   "exclude": [
     "node_modules"
   ]

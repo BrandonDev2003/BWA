@@ -1,0 +1,72 @@
+{
+  "nombre": "",
+  "apellido": "",
+  "cedula": "",
+  "estado_civil": "",
+  "numero": "",
+  "correo": "",
+  "genero": "",
+  "fecha_nacimiento": "",
+  "barrio": "",
+
+  "antecedentes_url": "",
+  "foto_cedula_frontal_url": "",
+  "foto_cedula_reverso_url": "",
+  "hoja_vida_url": "",
+
+  "fecha_ingreso": "",
+  "fecha_egreso": "",
+  "rol": "",
+
+  "banco": "",
+  "tipo_cuenta": "",
+  "numero_cuenta": "",
+
+  "password": ""
+}
+
+
+----------------
+INSERT INTO usuarios (
+    nombre,
+    apellido,
+    cedula,
+    estado_civil,
+    numero,
+    correo,
+    genero,
+    fecha_nacimiento,
+    barrio,
+    antecedentes_url,
+    foto_cedula_frontal_url,
+    foto_cedula_reverso_url,
+    hoja_vida_url,
+    fecha_ingreso,
+    fecha_egreso,
+    rol,
+    banco,
+    tipo_cuenta,
+    numero_cuenta,
+    password
+) VALUES (
+    'Carlos',
+    'Mendoza',
+    '1105236987',
+    'soltero',
+    '0987654321',
+    'admin@empresa.com',
+    'masculino',
+    '1990-05-12',
+    'Barrio Central',
+    'https://example.com/antecedentes.pdf',
+    'https://example.com/cedula_frontal.jpg',
+    'https://example.com/cedula_reverso.jpg',
+    'https://example.com/hoja_vida.pdf',
+    '2024-01-10',
+    NULL,
+    'admin',
+    'Banco Pichincha',
+    'ahorros',
+    '1234567890',
+    'Admin123!'
+);

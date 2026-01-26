@@ -1,0 +1,69 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/*
+  Modelo User mapeado a la tabla existente `users`.
+  Ajusta @map(...) si tus columnas tienen nombres distintos.
+*/
+model User {
+  id             Int     @id @default(autoincrement()) @map("id")
+  nombre         String  @map("nombre")
+  correo         String  @unique @map("correo")
+  cedula         String  @map("cedula") @unique
+  telefono       String? @map("telefono")
+  rol            String? @map("rol")
+  password       String? @map("password")
+  puede_ver_todo Boolean? @map("puede_ver_todo") // ajusta nombre exacto
+  creadoEn       DateTime @default(now()) @map("creadoEn")
+
+  // relaciones
+  leads Lead[]  @relation("UserLeads")
+  notes Note[]  @relation("UserNotes")
+
+  @@map("users")
+}
+
+/*
+  Modelo Lead mapeado a la tabla `leads`.
+  He usado nombres de campos comunes. Ajusta @map(...) al nombre real en la BD.
+*/
+model Lead {
+  id         Int      @id @default(autoincrement()) @map("id")
+  nombre     String   @map("nombre")
+  correo     String?  @map("correo")    // en tu DB era `email` o `correo` — ajusta
+  telefono   String?  @map("telefono")
+  estado     String   @default("nuevo") @map("estado")
+  descripcion String? @map("descripcion")
+  creadoEn   DateTime @default(now()) @map("creadoEn")
+
+  // FK hacia users (usuario asignado)
+  usuarioId  Int?     @map("usuarioId") // o "usuario_id" según tu BD
+  usuario    User?    @relation("UserLeads", fields: [usuarioId], references: [id])
+
+  notes      Note[]   @relation("LeadNotes")
+
+  @@map("leads")
+}
+
+/*
+  Modelo Note (notas) mapeado a la tabla notes.
+*/
+model Note {
+  id        Int      @id @default(autoincrement()) @map("id")
+  texto     String   @map("texto")
+  creadoEn  DateTime @default(now()) @map("creadoEn")
+
+  usuarioId Int?     @map("usuarioId")
+  leadId    Int?     @map("leadId")
+
+  usuario   User?    @relation("UserNotes", fields: [usuarioId], references: [id])
+  lead      Lead?    @relation("LeadNotes", fields: [leadId], references: [id])
+
+  @@map("notes")
+}

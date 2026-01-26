@@ -1,104 +1,75 @@
 "use client";
 
-import { useEffect, useState } from "react";
-
-interface Lead {
-  id: number;
-  nombre: string;
-  correo: string;
-  telefono: string;
-  origen: string;
-  estado: string;
-  asignado_a: number | null; // 👈 Guardamos el ID
-}
-
-interface User {
-  id: number;
-  nombre: string;
-  rol: string;
-}
+import { useState } from "react";
 
 export function useLeads() {
-  const [leads, setLeads] = useState<Lead[]>([]);
-  const [selectedLeads, setSelectedLeads] = useState<number[]>([]);
+  const [leads, setLeads] = useState([]);
+  const [users, setUsers] = useState([]);
   const [filtroEstado, setFiltroEstado] = useState("todos");
-  const [users, setUsers] = useState<User[]>([]);
+  const [selectedLeads, setSelectedLeads] = useState<number[]>([]);
   const [showAssignUsers, setShowAssignUsers] = useState(false);
 
-  // 📦 Cargar leads al iniciar
-  useEffect(() => {
-    (async () => {
-      const res = await fetch("/api/leads", { credentials: "include" });
-      const data = await res.json();
-      if (data.ok && Array.isArray(data.leads)) setLeads(data.leads);
-    })();
-  }, []);
-
-  // 👥 Cargar asesores
-  const fetchUsers = async () => {
-    const token = localStorage.getItem("token");
-    if (!token) return console.warn("⚠️ No hay token");
-
-    const res = await fetch("/api/users", {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-
-    if (!res.ok) return console.warn("❌ Error al obtener usuarios");
-    const data = await res.json();
-    setUsers(data.users || []);
-  };
-
-  // 🧩 Asignar lead(s) a asesor
-  const handleAssign = async (userId: number) => {
+  // Obtener leads
+  const fetchLeads = async () => {
     try {
-      const token = localStorage.getItem("token");
-      if (!token) throw new Error("No hay token de sesión");
+      const res = await fetch("/api/leads", {
+        credentials: "include",
+      });
 
-      const responses = await Promise.all(
-        selectedLeads.map((leadId) =>
-          fetch(`/api/leads/${leadId}`, {
-            method: "PUT",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({ asignado_a: userId }),
-          })
-        )
-      );
+      const data = await res.json();
 
-      // ✅ Verificamos que todos se asignaron correctamente
-      const allOk = responses.every((res) => res.ok);
-      if (!allOk) throw new Error("Error en una o más asignaciones");
-
-      // 🧠 Buscar nombre del asesor asignado
-      const nombreUsuario = users.find((u) => u.id === userId)?.nombre || "Sin nombre";
-
-      // ✅ Actualizamos el estado local
-      setLeads((prev) =>
-        prev.map((lead) =>
-          selectedLeads.includes(lead.id)
-            ? { ...lead, asignado_a: userId }
-            : lead
-        )
-      );
-
-      // 🧹 Limpiar selección y cerrar modal
-      setSelectedLeads([]);
-      setShowAssignUsers(false);
-    } catch (error) {
-      console.error("❌ Error asignando leads:", error);
-      alert("Error asignando leads");
+      // 🔥 FIX: asegurar array
+      setLeads(Array.isArray(data.leads) ? data.leads : []);
+    } catch (err) {
+      console.error("Error al obtener leads:", err);
+      setLeads([]);
     }
   };
 
-  // 🎯 Filtrar leads por estado
-  const filteredLeads = leads.filter((l) =>
-    filtroEstado === "todos" ? true : l.estado === filtroEstado
-  );
+  // Obtener usuarios
+  const fetchUsers = async () => {
+    try {
+      const res = await fetch("/api/users", {
+        credentials: "include",
+      });
+
+      const data = await res.json();
+
+      setUsers(Array.isArray(data.users) ? data.users : []);
+    } catch (err) {
+      console.error("Error al obtener usuarios:", err);
+      setUsers([]);
+    }
+  };
+
+  // Asignar leads
+  const handleAssign = async (userId: number) => {
+    try {
+      const res = await fetch("/api/leads/assigns", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          leadIds: selectedLeads,
+          asesorId: userId,
+        }),
+      });
+
+      if (!res.ok) throw new Error("Error asignando usuario");
+
+      // Refrescar la tabla
+      await fetchLeads();
+
+      setSelectedLeads([]);
+      setShowAssignUsers(false);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   return {
-    leads: filteredLeads,
+    leads,
+    fetchLeads,
     filtroEstado,
     setFiltroEstado,
     selectedLeads,

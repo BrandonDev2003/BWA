@@ -2,9 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { verifyToken } from "@/lib/auth";
 
+/* ===========================================================
+   GET → Obtener todas las notas de un lead
+   =========================================================== */
 export async function GET(
   req: NextRequest,
-  context: { params: { id: string } }
+  { params }: { params: { id: string } }
 ) {
   try {
     const user = await verifyToken(req);
@@ -12,22 +15,42 @@ export async function GET(
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
-    const leadId = Number(context.params.id);
-    if (!leadId) {
-      return NextResponse.json({ error: "Lead ID requerido" }, { status: 400 });
+    const leadId = Number(params.id);
+    if (!leadId || isNaN(leadId)) {
+      return NextResponse.json({ error: "ID inválido" }, { status: 400 });
     }
 
-    const notes = await query("SELECT * FROM notes WHERE lead_id = ?", [leadId]);
+    const notes = await query(
+      `SELECT 
+         n.id,
+         n.lead_id,
+         n.contenido,
+         n.autor_id,
+         u.nombre AS autor_nombre,
+         n.fecha_hora
+       FROM notes n
+       LEFT JOIN usuarios u ON u.id = n.autor_id
+       WHERE n.lead_id = ?
+       ORDER BY n.fecha_hora DESC`,
+      [leadId]
+    );
+
     return NextResponse.json(notes);
   } catch (err) {
     console.error("Error al obtener notas:", err);
-    return NextResponse.json({ error: "Error al obtener notas" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Error al obtener notas" },
+      { status: 500 }
+    );
   }
 }
 
+/* ===========================================================
+   POST → Crear una nueva nota
+   =========================================================== */
 export async function POST(
   req: NextRequest,
-  context: { params: { id: string } }
+  { params }: { params: { id: string } }
 ) {
   try {
     const user = await verifyToken(req);
@@ -35,26 +58,34 @@ export async function POST(
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
-    const leadId = Number(context.params.id);
-    if (!leadId) {
-      return NextResponse.json({ error: "Lead ID requerido" }, { status: 400 });
+    const leadId = Number(params.id);
+    if (!leadId || isNaN(leadId)) {
+      return NextResponse.json({ error: "ID inválido" }, { status: 400 });
     }
 
     const body = await req.json();
     const { contenido } = body;
 
-    if (!contenido) {
-      return NextResponse.json({ error: "Contenido requerido" }, { status: 400 });
+    if (!contenido || contenido.trim().length === 0) {
+      return NextResponse.json(
+        { error: "El contenido de la nota es obligatorio" },
+        { status: 400 }
+      );
     }
 
     await query(
-      "INSERT INTO notes (lead_id, contenido, autor_id, fecha_hora) VALUES (?, ?, ?, NOW())",
-      [leadId, contenido, user.id]
+      `INSERT INTO notes 
+         (lead_id, contenido, autor_id, fecha_hora)
+       VALUES (?, ?, ?, NOW())`,
+      [leadId, contenido.trim(), user.id]
     );
 
     return NextResponse.json({ success: true });
   } catch (err) {
     console.error("Error al guardar nota:", err);
-    return NextResponse.json({ error: "Error al guardar nota" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Error al guardar nota" },
+      { status: 500 }
+    );
   }
 }

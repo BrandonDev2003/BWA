@@ -1,9 +1,25 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Settings, LogOut, Menu } from "lucide-react"; // 👈 añadimos Menu
+import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
+import { Settings, LogOut, Menu, Check } from "lucide-react";
 import { useRouter } from "next/navigation";
 
+/* =========================
+   PORTAL (para dropdown)
+========================= */
+function Portal({ children }: { children: React.ReactNode }) {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => setMounted(true), []);
+  if (!mounted) return null;
+
+  return createPortal(children, document.body);
+}
+
+/* =========================
+   HEADER
+========================= */
 export default function Header({
   onToggleSidebar,
 }: {
@@ -11,157 +27,160 @@ export default function Header({
 }) {
   const router = useRouter();
   const [showMenu, setShowMenu] = useState(false);
-  const [theme, setTheme] = useState<string>("default");
-  const [mounted, setMounted] = useState(false);
+  const [theme, setTheme] = useState("default");
+  const menuButtonRef = useRef<HTMLButtonElement | null>(null);
 
-  // 🎨 Temas
   const themes = {
-    default: {
-      bg: "linear-gradient(135deg, #111827 0%, #000000 100%)",
-      text: "#ffffff",
-      card: "rgba(31, 41, 55, 0.6)",
-    },
-    ocean: {
-      bg: "linear-gradient(135deg, #1e3a8a 0%, #0891b2 100%)",
-      text: "#ffffff",
-      card: "rgba(30, 64, 175, 0.4)",
-    },
-    sunset: {
-      bg: "linear-gradient(135deg, #c2410c 0%, #db2777 100%)",
-      text: "#ffffff",
-      card: "rgba(190, 24, 93, 0.4)",
-    },
-    forest: {
-      bg: "linear-gradient(135deg, #065f46 0%, #059669 100%)",
-      text: "#ffffff",
-      card: "rgba(6, 95, 70, 0.4)",
-    },
-    violet: {
-      bg: "linear-gradient(135deg, #5b21b6 0%, #3730a3 100%)",
-      text: "#ffffff",
-      card: "rgba(67, 56, 202, 0.4)",
-    },
+    default: {},
+    ocean: {},
+    sunset: {},
+    forest: {},
+    violet: {},
   };
 
-  // 🧠 Cargar tema guardado
   useEffect(() => {
-    const savedTheme = localStorage.getItem("theme") || "default";
-    setTheme(savedTheme);
-    setMounted(true);
+    const saved = localStorage.getItem("theme") || "default";
+    setTheme(saved);
   }, []);
 
-  // 🖌️ Aplicar tema global
-  useEffect(() => {
-    if (!mounted) return;
-    const current = themes[theme as keyof typeof themes];
-    const root = document.documentElement;
-
-    root.style.setProperty("--app-background", current.bg);
-    root.style.setProperty("--app-text-color", current.text);
-    root.style.setProperty("--app-card-bg", current.card);
-    localStorage.setItem("theme", theme);
-  }, [theme, mounted]);
-
-  // 🚪 Logout
   const handleLogout = async () => {
     try {
       await fetch("/api/auth/logout", { method: "POST" });
     } catch {}
+
     localStorage.removeItem("token");
     localStorage.removeItem("theme");
     document.cookie = "token=; Max-Age=0; path=/;";
     router.push("/login");
   };
 
-  if (!mounted) return null;
-
   return (
     <header
-      className="flex justify-between items-center mb-10 relative p-4 rounded-2xl shadow-md transition-all duration-500 bg-card"
-      style={{
-        background: "var(--app-card-bg)",
-        color: "var(--app-text-color)",
-      }}
+      className="
+        relative
+        flex items-center justify-between
+        rounded-2xl
+        border border-white/10
+        bg-white/5
+        backdrop-blur-2xl
+        shadow-2xl
+        px-4 py-3
+        text-white
+      "
     >
-      {/* 🔹 Botón de menú + título */}
+      {/* IZQUIERDA */}
       <div className="flex items-center gap-3">
-        {onToggleSidebar && (
-          <button
-            onClick={onToggleSidebar}
-            className="p-2 rounded-lg hover:bg-white/10 transition"
-          >
-            <Menu className="w-6 h-6 text-inherit" />
-          </button>
-        )}
-        <h2 className="text-3xl font-bold text-inherit">Leads</h2>
+
+
+        <div>
+          <h2 className="text-xl md:text-2xl font-semibold">Leads</h2>
+          <p className="text-xs text-white/50 -mt-0.5">
+            Panel administrativo
+          </p>
+        </div>
       </div>
 
-      {/* ⚙️ Configuración y temas */}
-      <div className="relative">
-        <Settings
-          className="w-7 h-7 text-inherit hover:scale-110 transition-transform cursor-pointer"
-          onClick={() => setShowMenu(!showMenu)}
-        />
+      {/* DERECHA */}
+      <div className="flex items-center gap-3">
+        <button
+          ref={menuButtonRef}
+          onClick={() => setShowMenu((v) => !v)}
+          className="
+            h-10 w-10 rounded-xl
+            border border-white/10
+            bg-black/20
+            text-white/80
+            hover:bg-white/10 hover:text-white
+            transition
+            flex items-center justify-center
+          "
+          aria-label="Configuración"
+        >
+          <Settings className="w-5 h-5" />
+        </button>
+      </div>
 
-        {showMenu && (
+      {/* =========================
+          DROPDOWN (PORTAL)
+      ========================= */}
+      {showMenu && (
+        <Portal>
+          {/* backdrop */}
           <div
-            className="absolute right-0 mt-3 w-56 border border-gray-700 rounded-xl shadow-xl p-3 z-50 origin-top-right animate-fade-in"
-            style={{
-              background: "var(--app-card-bg)",
-              color: "var(--app-text-color)",
-              backdropFilter: "blur(10px)",
-            }}
+            className="fixed inset-0 z-[9999]"
+            onClick={() => setShowMenu(false)}
           >
-            <p className="text-sm font-semibold mb-2 opacity-80">🎨 Temas</p>
-
-            <div className="flex flex-col gap-2">
-              {Object.entries(themes).map(([key]) => (
-                <button
-                  key={key}
-                  onClick={() => {
-                    setTheme(key);
-                    setShowMenu(false);
-                  }}
-                  className={`px-3 py-2 rounded-lg text-sm transition-all duration-300 ${
-                    theme === key
-                      ? "bg-white/20 text-white"
-                      : "hover:bg-white/10"
-                  }`}
-                >
-                  {key.charAt(0).toUpperCase() + key.slice(1)}
-                </button>
-              ))}
-            </div>
-
-            <hr className="my-3 border-gray-600" />
-
-            <button
-              onClick={handleLogout}
-              className="w-full flex items-center justify-center gap-2 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-semibold transition-colors"
+            {/* menu */}
+            <div
+              className="
+                absolute right-6 top-20 w-72
+                rounded-2xl
+                border border-white/10
+                bg-white/5
+                backdrop-blur-2xl
+                shadow-2xl
+                overflow-hidden
+              "
+              onClick={(e) => e.stopPropagation()}
             >
-              <LogOut className="w-4 h-4" />
-              Cerrar sesión
-            </button>
-          </div>
-        )}
-      </div>
+              {/* overlay oscuro */}
+              <div className="pointer-events-none absolute inset-0 bg-black/25" />
 
-      {/* 💫 Animación */}
-      <style jsx>{`
-        @keyframes fade-in {
-          from {
-            opacity: 0;
-            transform: scale(0.95) translateY(-10px);
-          }
-          to {
-            opacity: 1;
-            transform: scale(1) translateY(0);
-          }
-        }
-        .animate-fade-in {
-          animation: fade-in 0.25s ease-out forwards;
-        }
-      `}</style>
+              <div className="relative p-3">
+                <p className="text-xs tracking-wide text-white/50 font-semibold mb-2">
+                  TEMAS
+                </p>
+
+                <div className="flex flex-col gap-1">
+                  {Object.keys(themes).map((k) => {
+                    const active = theme === k;
+                    return (
+                      <button
+                        key={k}
+                        onClick={() => {
+                          setTheme(k);
+                          localStorage.setItem("theme", k);
+                          setShowMenu(false);
+                        }}
+                        className={[
+                          "flex items-center justify-between",
+                          "px-3 py-2 rounded-xl text-sm",
+                          "border transition",
+                          active
+                            ? "bg-emerald-500/10 border-emerald-400/20 text-white"
+                            : "border-transparent text-white/70 hover:bg-white/10 hover:text-white",
+                        ].join(" ")}
+                      >
+                        <span>{k.charAt(0).toUpperCase() + k.slice(1)}</span>
+                        {active && (
+                          <Check className="w-4 h-4 text-emerald-300" />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="my-3 h-px w-full bg-white/10" />
+
+                <button
+                  onClick={handleLogout}
+                  className="
+                    w-full flex items-center justify-center gap-2
+                    py-2.5 rounded-xl
+                    bg-red-500/15 border border-red-500/20
+                    text-white/90 font-semibold
+                    hover:bg-red-500/25 hover:border-red-500/30
+                    transition
+                  "
+                >
+                  <LogOut className="w-4 h-4" />
+                  Cerrar sesión
+                </button>
+              </div>
+            </div>
+          </div>
+        </Portal>
+      )}
     </header>
   );
 }
