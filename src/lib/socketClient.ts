@@ -6,7 +6,7 @@ export function getSocket(userId: number) {
   if (!socket) {
     socket = io("http://localhost:3000", {
       path: "/socket.io",
-      transports: ["websocket"], // 🔥 fuerza websocket
+      transports: ["websocket"],
     });
 
     socket.on("connect", () => {

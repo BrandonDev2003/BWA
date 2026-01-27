@@ -12,3 +12,4 @@ export async function query<T extends QueryResultRow = any>(
   const res = await pool.query<T>(text, params);
   return res;
 }
+export default pool;

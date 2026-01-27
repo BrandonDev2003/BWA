@@ -7,7 +7,7 @@ import { verifyToken } from "@/lib/auth";
    =========================================================== */
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await verifyToken(req);
@@ -15,8 +15,10 @@ export async function GET(
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
-    const leadId = Number(params.id);
-    if (!leadId || isNaN(leadId)) {
+    const { id } = await params;
+
+    const leadId = Number(id);
+    if (!leadId || Number.isNaN(leadId)) {
       return NextResponse.json({ error: "ID inválido" }, { status: 400 });
     }
 
@@ -30,12 +32,13 @@ export async function GET(
          n.fecha_hora
        FROM notes n
        LEFT JOIN usuarios u ON u.id = n.autor_id
-       WHERE n.lead_id = ?
+       WHERE n.lead_id = $1
        ORDER BY n.fecha_hora DESC`,
       [leadId]
     );
 
-    return NextResponse.json(notes);
+    // Con pg, el resultado viene en notes.rows
+    return NextResponse.json(notes.rows);
   } catch (err) {
     console.error("Error al obtener notas:", err);
     return NextResponse.json(
@@ -50,7 +53,7 @@ export async function GET(
    =========================================================== */
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await verifyToken(req);
@@ -58,13 +61,15 @@ export async function POST(
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
-    const leadId = Number(params.id);
-    if (!leadId || isNaN(leadId)) {
+    const { id } = await params;
+
+    const leadId = Number(id);
+    if (!leadId || Number.isNaN(leadId)) {
       return NextResponse.json({ error: "ID inválido" }, { status: 400 });
     }
 
     const body = await req.json();
-    const { contenido } = body;
+    const contenido: string = body?.contenido;
 
     if (!contenido || contenido.trim().length === 0) {
       return NextResponse.json(
@@ -74,13 +79,12 @@ export async function POST(
     }
 
     await query(
-      `INSERT INTO notes 
-         (lead_id, contenido, autor_id, fecha_hora)
-       VALUES (?, ?, ?, NOW())`,
+      `INSERT INTO notes (lead_id, contenido, autor_id, fecha_hora)
+       VALUES ($1, $2, $3, NOW())`,
       [leadId, contenido.trim(), user.id]
     );
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true }, { status: 201 });
   } catch (err) {
     console.error("Error al guardar nota:", err);
     return NextResponse.json(
