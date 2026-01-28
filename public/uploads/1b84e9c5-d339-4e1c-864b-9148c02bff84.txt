@@ -1,0 +1,3 @@
+yarn create next-app nombre-de-tu-proyecto
+cd nombre-de-tu-proyecto
+yarn dev

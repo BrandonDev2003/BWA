@@ -1,0 +1,202 @@
+@import "tailwindcss";
+
+/* 🎨 Variables iniciales */
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+
+  /* Variables del tema controladas por Header */
+  --app-background: linear-gradient(135deg, #111827 0%, #000000 100%);
+  --app-text-color: #ffffff;
+  --app-card-bg: rgba(31, 41, 55, 0.6);
+}
+
+/* 🌙 Oscuro automático si no hay tema */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+/* 🎨 Conexión con Tailwind */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+/* 🌍 🔥 Fondo dinámico principal */
+html,
+body,
+#__next {
+  min-height: 100%;
+  background: var(--app-background); /* 👈 ESTA LÍNEA ES CLAVE */
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  background-size: cover;
+  color: var(--app-text-color); /* 👈 Y ESTA TAMBIÉN */
+  transition: background 0.6s ease, color 0.6s ease;
+  font-family: var(--font-geist-sans), Arial, sans-serif;
+}
+
+/* 🌫️ Tarjetas, headers, sidebars */
+.bg-card {
+  background: var(--app-card-bg);
+  backdrop-filter: saturate(140%) blur(6px);
+  transition: background 0.6s ease;
+}
+
+/* 🔤 Heredar color de texto */
+.text-inherit {
+  color: inherit;
+}
+/* Flip Card Animation */
+.flip-card {
+  background-color: transparent;
+  width: 220px;
+  height: 280px;
+  perspective: 1000px;
+  font-family: sans-serif;
+}
+
+.flip-card-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  text-align: center;
+  transition: transform 0.8s;
+  transform-style: preserve-3d;
+}
+
+.flip-card:hover .flip-card-inner {
+  transform: rotateY(180deg);
+}
+
+.flip-card-front, .flip-card-back {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  padding: 1rem;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  border-radius: 1rem;
+  box-shadow: 0 8px 14px 0 rgba(0,0,0,0.2);
+}
+
+.flip-card-front {
+  background: linear-gradient(
+    120deg,
+    bisque 60%,
+    rgb(255, 231, 222) 88%,
+    rgb(255, 211, 195) 40%,
+    rgba(255, 127, 80, 0.603) 48%
+  );
+  color: coral;
+}
+
+.flip-card-back {
+  background: linear-gradient(
+    120deg,
+    rgb(255, 174, 145) 30%,
+    coral 88%,
+    bisque 40%,
+    rgb(255, 185, 160) 78%
+  );
+  color: white;
+  transform: rotateY(180deg);
+}
+
+.title {
+  font-size: 1.3em;
+  font-weight: 900;
+  margin-bottom: 8px;
+}
+.focus-container {
+  position: relative;
+  display: flex;
+  gap: 1em;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.focus-word {
+  position: relative;
+  font-size: 3rem;
+  font-weight: 900;
+  cursor: pointer;
+  transition:
+    filter 0.3s ease,
+    color 0.3s ease;
+}
+
+.focus-word.active {
+  filter: blur(0);
+}
+
+.focus-frame {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  box-sizing: content-box;
+  border: none;
+}
+
+.corner {
+  position: absolute;
+  width: 1rem;
+  height: 1rem;
+  border: 3px solid var(--border-color, #fff);
+  filter: drop-shadow(0px 0px 4px var(--border-color, #fff));
+  border-radius: 3px;
+  transition: none;
+}
+
+.top-left {
+  top: -10px;
+  left: -10px;
+  border-right: none;
+  border-bottom: none;
+}
+
+.top-right {
+  top: -10px;
+  right: -10px;
+  border-left: none;
+  border-bottom: none;
+}
+
+.bottom-left {
+  bottom: -10px;
+  left: -10px;
+  border-right: none;
+  border-top: none;
+}
+
+.bottom-right {
+  bottom: -10px;
+  right: -10px;
+  border-left: none;
+  border-top: none;
+}
+@keyframes slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-in {
+  animation: slide-in 0.3s ease-out;
+}
