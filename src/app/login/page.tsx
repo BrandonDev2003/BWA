@@ -60,7 +60,7 @@ export default function LoginPage() {
     } else if (rol === "rrhh") {
       router.replace("/rrhh/home");
     } else if (rol === "asesor") {
-      router.replace("/asesor/chats");
+      router.replace("/Asesor/home");
     } else {
       router.replace("/usuarios/home");
     }

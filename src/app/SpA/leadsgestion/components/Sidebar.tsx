@@ -11,6 +11,7 @@ import {
   ChevronRight,
   Server,
   ClipboardList,
+  Users,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -27,6 +28,7 @@ const spaMenu = [
   { label: "Home", href: "/SpA/home", icon: Home },
   { label: "Leads", href: "/SpA/leads", icon: Mail },
   { label: "Leads Gestión", href: "/SpA/leadsgestion", icon: ClipboardList },
+  { label: "Usuarios", href: "/SpA/usuarios", icon: Users },
 ];
 
 export default function SidebarSpA() {

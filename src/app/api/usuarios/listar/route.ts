@@ -46,7 +46,9 @@ export async function GET(req: NextRequest) {
     let where = "";
     const params: any[] = [];
 
-    if (!(rol === "admin" || rol === "administrador" || rol === "Administrador" || rol === "rrhh" || rol === "RRHH")) {
+
+    if (!(rol === "admin" || rol === "administrador" || rol === "SpA" || rol === "rrhh" || rol === "RRHH")) {
+
       where = "WHERE u.id = $1";
       params.push(decoded.id);
     }

@@ -20,9 +20,9 @@ type MeUser = {
 };
 
 const asesorMenu = [
-  { label: "Home", href: "/asesor/home", icon: Folder },
-  { label: "Chats", href: "/asesor/chats", icon: MessageSquare },
-  { label: "Leads Gestión", href: "/asesor/leadsgestion", icon: ClipboardList },
+  { label: "Home", href: "/Asesor/home", icon: Folder },
+  { label: "Chats", href: "/Asesor/chats", icon: MessageSquare },
+  { label: "Leads Gestión", href: "/Asesor/leadsgestion", icon: ClipboardList },
 ];
 
 type SidebarAsesorProps = {
