@@ -49,9 +49,9 @@ function DashboardInner() {
         const data = await res.json();
 
         if (
-          !data.ok ||
+          !data.ok || 
           !data.user?.rol ||
-          !(data.user.rol === "admin" || data.user.rol === "Administrador")
+          !(data.user.rol === "SpA" || data.user.rol === "SPA" || data.user.rol === "spa")
         ) {
           setAuthStatus("unauthorized");
           return;
@@ -130,7 +130,7 @@ function DashboardInner() {
 
       <div className="relative flex min-h-screen">
         {/* SIDEBAR (ajusta props según tu componente real) */}
-        {/* <Sidebar open={openSidebar} setOpen={setOpenSidebar} /> */}
+        <Sidebar />
 
         <div className="flex-1 p-6 md:p-8">
           <div className="mb-6">

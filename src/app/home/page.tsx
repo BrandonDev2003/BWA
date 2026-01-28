@@ -44,7 +44,7 @@ type Post = {
 };
 
 function isAdminRole(rol?: string | null) {
-  return rol === "admin" || rol === "administrador" || rol === "Administrador";
+  return rol === "admin" || rol === "administrador" || rol === "Administrador" || rol  === "SpA" || rol === "SPA" || rol === "spa";;
 }
 
 function UsersTooltip({ users }: { users?: string[] }) {

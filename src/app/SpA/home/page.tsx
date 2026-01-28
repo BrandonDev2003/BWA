@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import Sidebar from "../usuarios/components/Sidebar";
+import Sidebar from "../home/components/Sidebar";
 
 type Reaction = "like" | "love" | "dislike" | "haha";
 

@@ -40,7 +40,7 @@ export default function CRMHome() {
         if (!data.ok) return setAuthStatus("unauthorized");
         if (!data.user || !data.user.rol) return setAuthStatus("unauthorized");
 
-        if (data.user.rol === "admin" || data.user.rol === "Administrador") {
+        if (data.user.rol === "spa" || data.user.rol === "Administrador") {
           setAuthStatus("authorized");
         } else {
           setAuthStatus("unauthorized");
@@ -93,7 +93,7 @@ export default function CRMHome() {
           />
         </div>
 
-        {/* Filters card */}
+        {/* Filters card 
         <div className="mb-6 rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-4 shadow-2xl">
           <Filters
             filtroEstado={filtroEstado}
@@ -104,7 +104,7 @@ export default function CRMHome() {
               setShowAssignUsers(!showAssignUsers);
             }}
           />
-        </div>
+        </div>*/}
 
         {showAssignUsers && (
           <div className="mb-6 rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-4 shadow-2xl">
