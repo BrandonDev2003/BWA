@@ -25,7 +25,12 @@ export default function LeadsGestion() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [filtro, setFiltro] = useState<"todos" | "pendiente" | "contactado" | "cerrado">("todos");
+  // ✅ ESTO FALTABA (por eso te daba Cannot find name 'sidebarOpen')
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const [filtro, setFiltro] = useState<
+    "todos" | "pendiente" | "contactado" | "cerrado"
+  >("todos");
 
   const [openForm, setOpenForm] = useState(false);
 
@@ -131,7 +136,8 @@ export default function LeadsGestion() {
 
   const leadsFiltrados = leads.filter((lead) => {
     if (filtro === "todos") return true;
-    if (filtro === "pendiente") return lead.estado === "Nuevo" || lead.estado === "En Proceso";
+    if (filtro === "pendiente")
+      return lead.estado === "Nuevo" || lead.estado === "En Proceso";
     if (filtro === "contactado") return lead.estado === "Contactado";
     if (filtro === "cerrado") return lead.estado === "Cerrado";
     return true;
@@ -139,11 +145,13 @@ export default function LeadsGestion() {
 
   return (
     <div className="flex min-h-screen">
-      <Sidebar />
+      <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} />
 
       <div className="flex-1 p-6">
         <div className="flex items-center justify-between gap-4 mb-6">
-          <h1 className="text-2xl font-bold text-white">Gestión de Leads del Asesor</h1>
+          <h1 className="text-2xl font-bold text-white">
+            Gestión de Leads del Asesor
+          </h1>
 
           <button
             onClick={() => setOpenForm(true)}
@@ -164,10 +172,16 @@ export default function LeadsGestion() {
           <FilterBtn active={filtro === "todos"} onClick={() => setFiltro("todos")}>
             Todos
           </FilterBtn>
-          <FilterBtn active={filtro === "pendiente"} onClick={() => setFiltro("pendiente")}>
+          <FilterBtn
+            active={filtro === "pendiente"}
+            onClick={() => setFiltro("pendiente")}
+          >
             Pendientes
           </FilterBtn>
-          <FilterBtn active={filtro === "contactado"} onClick={() => setFiltro("contactado")}>
+          <FilterBtn
+            active={filtro === "contactado"}
+            onClick={() => setFiltro("contactado")}
+          >
             Contactados
           </FilterBtn>
           <FilterBtn active={filtro === "cerrado"} onClick={() => setFiltro("cerrado")}>
@@ -180,7 +194,10 @@ export default function LeadsGestion() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {leadsFiltrados.map((lead) => (
-              <LeadCard key={lead.id || `${lead.nombre}-${lead.telefono}-${Math.random()}`} lead={lead} />
+              <LeadCard
+                key={lead.id || `${lead.nombre}-${lead.telefono}-${Math.random()}`}
+                lead={lead}
+              />
             ))}
           </div>
         )}
@@ -292,7 +309,10 @@ export default function LeadsGestion() {
                     "
                     value={form.estado}
                     onChange={(e) =>
-                      setForm((f) => ({ ...f, estado: e.target.value as Lead["estado"] }))
+                      setForm((f) => ({
+                        ...f,
+                        estado: e.target.value as Lead["estado"],
+                      }))
                     }
                   >
                     <option value="Nuevo" className="text-black">Nuevo</option>
@@ -444,4 +464,3 @@ function InputNumber({
     </div>
   );
 }
-    
