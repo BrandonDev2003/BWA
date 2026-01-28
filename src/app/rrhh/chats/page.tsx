@@ -210,7 +210,7 @@ export default function ChatsPage() {
       {/* Overlay para que se lea el texto */}
       <div className="h-full w-full bg-black/55">
         <div className="relative flex h-full">
-
+          <Sidebar />
 
           <main className="flex-1 h-full overflow-hidden p-4 md:p-6">
             <div className="flex h-full gap-4">
