@@ -27,16 +27,17 @@ export default function LeadsGestion() {
 
   const [filtro, setFiltro] = useState<"todos" | "pendiente" | "contactado" | "cerrado">("todos");
 
-  // Modal + form
   const [openForm, setOpenForm] = useState(false);
+
+  // ✅ Ecuador por defecto
   const [form, setForm] = useState({
     nombre: "",
     apellido: "",
     telefono: "",
     correo: "",
     estado: "Nuevo" as Lead["estado"],
-    codigo_pais: "+57",
-    pais: "Colombia",
+    codigo_pais: "+593",
+    pais: "Ecuador",
     meses_inversion: 0,
     monto_inversion: 0,
   });
@@ -61,6 +62,15 @@ export default function LeadsGestion() {
   }, []);
 
   async function crearLead() {
+    if (!form.nombre.trim() || !form.telefono.trim()) {
+      alert("⚠ Nombre y Teléfono son obligatorios");
+      return;
+    }
+    if ((form.codigo_pais || "").trim().length > 10) {
+      alert("⚠ El código de país no puede superar 10 caracteres");
+      return;
+    }
+
     setSaving(true);
     setError(null);
 
@@ -90,7 +100,7 @@ export default function LeadsGestion() {
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        setError(data?.error || "No se pudo crear el lead");
+        alert(`⚠ ${data?.error || "No se pudo crear el lead"}`);
         return;
       }
 
@@ -102,15 +112,15 @@ export default function LeadsGestion() {
         telefono: "",
         correo: "",
         estado: "Nuevo",
-        codigo_pais: "+57",
-        pais: "Colombia",
+        codigo_pais: "+593",
+        pais: "Ecuador",
         meses_inversion: 0,
         monto_inversion: 0,
       });
 
       setOpenForm(false);
     } catch {
-      setError("Error creando lead");
+      alert("⚠ Error creando lead");
     } finally {
       setSaving(false);
     }
@@ -132,7 +142,6 @@ export default function LeadsGestion() {
       <Sidebar />
 
       <div className="flex-1 p-6">
-        {/* HEADER */}
         <div className="flex items-center justify-between gap-4 mb-6">
           <h1 className="text-2xl font-bold text-white">Gestión de Leads del Asesor</h1>
 
@@ -151,7 +160,6 @@ export default function LeadsGestion() {
           </button>
         </div>
 
-        {/* FILTROS */}
         <div className="flex gap-3 mb-6 flex-wrap">
           <FilterBtn active={filtro === "todos"} onClick={() => setFiltro("todos")}>
             Todos
@@ -167,7 +175,6 @@ export default function LeadsGestion() {
           </FilterBtn>
         </div>
 
-        {/* LISTA */}
         {leadsFiltrados.length === 0 ? (
           <p className="text-white/70">No hay leads en esta categoría.</p>
         ) : (
@@ -178,7 +185,6 @@ export default function LeadsGestion() {
           </div>
         )}
 
-        {/* MODAL */}
         {openForm && (
           <div
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
@@ -221,7 +227,6 @@ export default function LeadsGestion() {
                 </button>
               </div>
 
-              {/* FORM */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <InputField
                   label="Nombre *"
@@ -241,8 +246,15 @@ export default function LeadsGestion() {
                   <InputField
                     label="Código País"
                     value={form.codigo_pais}
-                    onChange={(v) => setForm((f) => ({ ...f, codigo_pais: v }))}
-                    placeholder="+57"
+                    maxLength={10}
+                    onChange={(v) => {
+                      if (v.length > 10) {
+                        alert("⚠ El código de país no puede superar 10 caracteres");
+                        return;
+                      }
+                      setForm((f) => ({ ...f, codigo_pais: v }));
+                    }}
+                    placeholder="+593"
                   />
 
                   <div className="md:col-span-2">
@@ -250,7 +262,7 @@ export default function LeadsGestion() {
                       label="Teléfono *"
                       value={form.telefono}
                       onChange={(v) => setForm((f) => ({ ...f, telefono: v }))}
-                      placeholder="3001234567"
+                      placeholder="0999999999"
                     />
                   </div>
                 </div>
@@ -266,7 +278,7 @@ export default function LeadsGestion() {
                   label="País"
                   value={form.pais}
                   onChange={(v) => setForm((f) => ({ ...f, pais: v }))}
-                  placeholder="Colombia"
+                  placeholder="Ecuador"
                 />
 
                 <div>
@@ -305,7 +317,6 @@ export default function LeadsGestion() {
                 />
               </div>
 
-              {/* FOOTER */}
               <div className="flex items-center justify-between gap-3 mt-6">
                 <p className="text-xs text-white/50">* Obligatorio: Nombre y Teléfono</p>
 
@@ -348,8 +359,6 @@ export default function LeadsGestion() {
   );
 }
 
-/* ---------- UI helpers ---------- */
-
 function FilterBtn({
   active,
   onClick,
@@ -379,11 +388,13 @@ function InputField({
   value,
   onChange,
   placeholder,
+  maxLength,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
+  maxLength?: number;
 }) {
   return (
     <div>
@@ -397,6 +408,7 @@ function InputField({
         "
         value={value}
         placeholder={placeholder}
+        maxLength={maxLength}
         onChange={(e) => onChange(e.target.value)}
       />
     </div>
@@ -432,3 +444,4 @@ function InputNumber({
     </div>
   );
 }
+    
