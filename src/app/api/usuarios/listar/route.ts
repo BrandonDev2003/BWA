@@ -47,7 +47,7 @@ export async function GET(req: NextRequest) {
     const params: any[] = [];
 
 
-    if (!(rol === "admin" || rol === "administrador" || rol === "SpA" || rol === "rrhh" || rol === "RRHH")) {
+    if (!(rol === "admin" || rol === "administrador" || rol === "SpA" || rol === "rrhh" || rol === "RRHH" || rol === "spa" )) {
 
       where = "WHERE u.id = $1";
       params.push(decoded.id);
