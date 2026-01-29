@@ -1,14 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import { User, Mail, Lock, Unlock } from "lucide-react";
 
+export type ModalMode = "add" | "edit" | "view";
+
 interface UsuarioModalProps {
-  mode: "add" | "edit";
+  mode: ModalMode;
   user?: any;
   onClose: () => void;
-  onAddUser?: (user: any) => void;
-  onEditUser?: (user: any) => void;
+  onAddUser?: (user: any) => Promise<void> | void;
+  onEditUser?: (user: any) => Promise<void> | void;
 }
 
 export default function UsuarioModal({
@@ -18,6 +20,10 @@ export default function UsuarioModal({
   onAddUser,
   onEditUser,
 }: UsuarioModalProps) {
+  const isReadOnly = mode === "view";
+  const isEdit = mode === "edit";
+  const isAdd = mode === "add";
+
   // ---------------- ESTADOS ----------------
   const [nombre, setNombre] = useState(user?.nombre || "");
   const [correo, setCorreo] = useState(user?.correo || "");
@@ -30,26 +36,29 @@ export default function UsuarioModal({
   const [cedulaReverso, setCedulaReverso] = useState<File | null>(null);
 
   const [locked, setLocked] = useState({
-    nombre: mode === "edit",
-    correo: mode === "edit",
-    cedula: mode === "edit",
-    rol: mode === "edit",
-    password: true, // por seguridad en edit, iniciar bloqueada
-    fotoAsesor: mode === "edit",
-    cedulaFrontal: mode === "edit",
-    cedulaReverso: mode === "edit",
+    nombre: !isAdd,
+    correo: !isAdd,
+    cedula: !isAdd,
+    rol: !isAdd,
+    password: !isAdd, // en edit/view bloqueada por defecto
+    fotoAsesor: !isAdd,
+    cedulaFrontal: !isAdd,
+    cedulaReverso: !isAdd,
   });
 
   // ---------------- FUNCIONES ----------------
-  const toggleLock = (field: keyof typeof locked) =>
+  const toggleLock = (field: keyof typeof locked) => {
+    if (isReadOnly) return; // en view no se desbloquea
     setLocked((prev) => ({ ...prev, [field]: !prev[field] }));
+  };
 
   const generarPassword = () => {
     const chars =
       "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%";
     let pass = "";
-    for (let i = 0; i < 10; i++)
+    for (let i = 0; i < 10; i++) {
       pass += chars[Math.floor(Math.random() * chars.length)];
+    }
     setPassword(pass);
   };
 
@@ -60,7 +69,9 @@ export default function UsuarioModal({
     };
 
   const handleSubmit = async () => {
-    if (!nombre || !correo || !cedula || !rol || (mode === "add" && !password)) {
+    if (isReadOnly) return;
+
+    if (!nombre || !correo || !cedula || !rol || (isAdd && !password)) {
       return alert("Completa todos los campos");
     }
 
@@ -73,17 +84,18 @@ export default function UsuarioModal({
       });
 
     const userData: any = { nombre, correo, cedula, rol };
-    if ((mode === "add" || (mode === "edit" && password)) && password) {
+
+    if ((isAdd || (isEdit && password)) && password) {
       userData.password = password;
     }
+
     if (fotoAsesor) userData.foto_asesor = await toBase64(fotoAsesor);
     if (cedulaFrontal) userData.cedula_frontal = await toBase64(cedulaFrontal);
     if (cedulaReverso) userData.cedula_reverso = await toBase64(cedulaReverso);
 
     try {
-      if (mode === "add" && onAddUser) await onAddUser(userData);
-      if (mode === "edit" && onEditUser)
-        await onEditUser({ ...userData, id: user.id });
+      if (isAdd && onAddUser) await onAddUser(userData);
+      if (isEdit && onEditUser) await onEditUser({ ...userData, id: user?.id });
       onClose();
     } catch (err) {
       console.error(err);
@@ -91,7 +103,7 @@ export default function UsuarioModal({
     }
   };
 
-  // ---------------- RENDER ----------------
+  // ---------------- RENDER HELPERS ----------------
   const renderInput = (
     label: string,
     value: string,
@@ -99,7 +111,6 @@ export default function UsuarioModal({
     field: keyof typeof locked,
     type: string = "text",
     icon?: React.ReactNode
-
   ) => (
     <div className="flex items-center gap-2 bg-gray-800 rounded-lg p-2">
       {icon}
@@ -113,7 +124,7 @@ export default function UsuarioModal({
         }`}
         disabled={locked[field]}
       />
-      {mode === "edit" && (
+      {(isEdit || isReadOnly) && (
         <button type="button" onClick={() => toggleLock(field)}>
           {locked[field] ? (
             <Lock className="w-5 h-5 text-gray-400" />
@@ -153,6 +164,7 @@ export default function UsuarioModal({
         ) : (
           <span className="text-gray-400 text-center">{label}</span>
         )}
+
         <input
           type="file"
           accept="image/*"
@@ -161,8 +173,9 @@ export default function UsuarioModal({
           className="hidden"
         />
       </label>
-      {mode === "edit" && (
-        <button onClick={() => toggleLock(field)}>
+
+      {(isEdit || isReadOnly) && (
+        <button type="button" onClick={() => toggleLock(field)}>
           {locked[field] ? (
             <Lock className="w-4 h-4 text-gray-400" />
           ) : (
@@ -177,7 +190,7 @@ export default function UsuarioModal({
     <div className="fixed inset-0 flex items-center justify-center bg-black/70 backdrop-blur-sm z-50">
       <div className="bg-gray-900 border border-gray-800 rounded-xl p-8 w-full max-w-lg shadow-xl">
         <h2 className="text-xl font-semibold mb-6 text-center">
-          {mode === "add" ? "🆕 Nuevo Asesor" : `✏️ Editar Asesor`}
+          {isAdd ? "🆕 Nuevo Asesor" : isEdit ? "✏️ Editar Asesor" : "👁️ Ver Asesor"}
         </h2>
 
         <div className="space-y-4">
@@ -189,6 +202,7 @@ export default function UsuarioModal({
             "text",
             <User className="w-5 h-5 text-gray-400" />
           )}
+
           {renderInput(
             "Correo",
             correo,
@@ -197,6 +211,7 @@ export default function UsuarioModal({
             "email",
             <Mail className="w-5 h-5 text-gray-400" />
           )}
+
           {renderInput("Cédula", cedula, setCedula, "cedula")}
 
           <div className="flex items-center gap-2 bg-gray-800 rounded-lg p-2">
@@ -210,11 +225,12 @@ export default function UsuarioModal({
             >
               <option value="asesor">Asesor</option>
               <option value="admin">Administrador</option>
-              <option value="RRHH">RRHH</option>
-              <option value="RRHH">spa</option>
+              <option value="rrhh">RRHH</option>
+              <option value="spa">SpA</option>
             </select>
-            {mode === "edit" && (
-              <button onClick={() => toggleLock("rol")}>
+
+            {(isEdit || isReadOnly) && (
+              <button type="button" onClick={() => toggleLock("rol")}>
                 {locked.rol ? (
                   <Lock className="w-5 h-5 text-gray-400" />
                 ) : (
@@ -225,7 +241,7 @@ export default function UsuarioModal({
           </div>
 
           {/* Contraseña */}
-          {(mode === "add" || mode === "edit") && (
+          {!isReadOnly && (
             <div className="flex items-center gap-2 bg-gray-800 rounded-lg p-2">
               <input
                 type="text"
@@ -237,8 +253,13 @@ export default function UsuarioModal({
                 }`}
                 disabled={locked.password}
               />
-              {mode === "edit" && (
-                <button type="button" onClick={() => toggleLock("password")}>
+
+              {isEdit && (
+                <button
+                  type="button"
+                  onClick={() => toggleLock("password")}
+                  title="Desbloquear"
+                >
                   {locked.password ? (
                     <Lock className="w-5 h-5 text-gray-400" />
                   ) : (
@@ -246,16 +267,20 @@ export default function UsuarioModal({
                   )}
                 </button>
               )}
-              {!locked.password && (
+
+              {isAdd && (
                 <button
+                  type="button"
                   onClick={generarPassword}
                   className="text-sm bg-purple-600 hover:bg-purple-700 px-3 py-1 rounded-lg"
                 >
                   Generar
                 </button>
               )}
-              {mode === "add" && (
+
+              {isEdit && !locked.password && (
                 <button
+                  type="button"
                   onClick={generarPassword}
                   className="text-sm bg-purple-600 hover:bg-purple-700 px-3 py-1 rounded-lg"
                 >
@@ -292,17 +317,22 @@ export default function UsuarioModal({
 
         <div className="flex justify-end gap-3 mt-6">
           <button
+            type="button"
             onClick={onClose}
             className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-full"
           >
-            Cancelar
+            {isReadOnly ? "Cerrar" : "Cancelar"}
           </button>
-          <button
-            onClick={handleSubmit}
-            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-full shadow"
-          >
-            {mode === "add" ? "Crear usuario" : "Guardar cambios"}
-          </button>
+
+          {!isReadOnly && (
+            <button
+              type="button"
+              onClick={handleSubmit}
+              className="px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-full shadow"
+            >
+              {isAdd ? "Crear usuario" : "Guardar cambios"}
+            </button>
+          )}
         </div>
       </div>
     </div>

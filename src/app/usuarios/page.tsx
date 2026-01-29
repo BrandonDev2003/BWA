@@ -1,321 +1,361 @@
 "use client";
 
-import React from "react";
-import { useState } from "react";
-import { User, Mail, Lock, Unlock } from "lucide-react";
+import { useState, useMemo, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { motion } from "framer-motion";
+import { Menu, PlusCircle } from "lucide-react";
 
-interface UsuarioModalProps {
-  mode: "add" | "edit";
-  user?: any;
-  onClose: () => void;
-  onAddUser?: (user: any) => void;
-  onEditUser?: (user: any) => void;
-}
+import Sidebar from "../usuarios/components/Sidebar";
+import UsuariosTable from "../usuarios/components/UsuariosTable";
+import UsuarioModal from "../usuarios/components/UsuarioModal";
+import { useUsuarios, User } from "../usuarios/components/useUsuarios";
 
-export default function UsuarioModal({
-  mode,
-  user,
-  onClose,
-  onAddUser,
-  onEditUser,
-}: UsuarioModalProps) {
-  // ---------------- ESTADOS ----------------
-  const [nombre, setNombre] = useState(user?.nombre || "");
-  const [correo, setCorreo] = useState(user?.correo || "");
-  const [cedula, setCedula] = useState(user?.cedula || "");
-  const [rol, setRol] = useState(user?.rol || "asesor");
-  const [password, setPassword] = useState("");
+export default function UsuariosPage() {
+  const router = useRouter();
+  const { usuarios, loading, agregarUsuario, editarUsuario, cargarUsuarios } =
+    useUsuarios();
 
-  const [fotoAsesor, setFotoAsesor] = useState<File | null>(null);
-  const [cedulaFrontal, setCedulaFrontal] = useState<File | null>(null);
-  const [cedulaReverso, setCedulaReverso] = useState<File | null>(null);
+  // --- Estados ---
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [modalMode, setModalMode] = useState<"add" | "edit" | "view">("add");
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
 
-  const [locked, setLocked] = useState({
-    nombre: mode === "edit",
-    correo: mode === "edit",
-    cedula: mode === "edit",
-    rol: mode === "edit",
-    password: true, // por seguridad en edit, iniciar bloqueada
-    fotoAsesor: mode === "edit",
-    cedulaFrontal: mode === "edit",
-    cedulaReverso: mode === "edit",
-  });
+  // --- OTP edición ---
+  const [showOtpModal, setShowOtpModal] = useState(false);
+  const [otpUser, setOtpUser] = useState<User | null>(null);
+  const [otpInput, setOtpInput] = useState("");
+  const [otpError, setOtpError] = useState("");
 
-  // ---------------- FUNCIONES ----------------
-  const toggleLock = (field: keyof typeof locked) =>
-    setLocked((prev) => ({ ...prev, [field]: !prev[field] }));
+  // --- Filtros ---
+  const [filterCorreo, setFilterCorreo] = useState("");
+  const [filterRol, setFilterRol] = useState("");
 
-  const generarPassword = () => {
-    const chars =
-      "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%";
-    let pass = "";
-    for (let i = 0; i < 10; i++)
-      pass += chars[Math.floor(Math.random() * chars.length)];
-    setPassword(pass);
-  };
+  // --- Auth ---
+  const [authStatus, setAuthStatus] = useState<
+    "loading" | "authorized" | "unauthorized"
+  >("loading");
+  const [userRol, setUserRol] = useState<string | null>(null);
 
-  const handleFileChange =
-    (setter: (file: File | null) => void) =>
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      if (e.target.files && e.target.files[0]) setter(e.target.files[0]);
+  // --- Filtrado ---
+  const usuariosFiltrados = useMemo(() => {
+    return usuarios.filter((u) => {
+      const matchCorreo = (u.correo || "").includes(filterCorreo);
+      const matchRol = filterRol ? u.rol === filterRol : true;
+      return matchCorreo && matchRol;
+    });
+  }, [usuarios, filterCorreo, filterRol]);
+
+  // --- Verificación ---
+  useEffect(() => {
+    const verifyUser = async () => {
+      try {
+        const res = await fetch("/api/auth/verify", { cache: "no-store" });
+        const data = await res.json();
+
+        if (
+          data.ok &&
+          (data.user.rol === "admin" ||
+            data.user.rol === "spa" ||
+            data.user.rol === "rrhh")
+        ) {
+          setUserRol(data.user.rol);
+          setAuthStatus("authorized");
+        } else {
+          setAuthStatus("unauthorized");
+        }
+      } catch {
+        setAuthStatus("unauthorized");
+      }
     };
 
-  const handleSubmit = async () => {
-    if (!nombre || !correo || !cedula || !rol || (mode === "add" && !password)) {
-      return alert("Completa todos los campos");
-    }
+    verifyUser();
+  }, []);
 
-    const toBase64 = (file: File) =>
-      new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = (err) => reject(err);
+  // --- Redirección ---
+  useEffect(() => {
+    if (authStatus === "unauthorized") {
+      router.replace("/login");
+    }
+  }, [authStatus, router]);
+
+  if (authStatus === "loading") {
+    return (
+      <div className="min-h-screen grid place-items-center bg-[#0B0D10] text-white">
+        <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl px-6 py-4 shadow-2xl">
+          Validando acceso...
+        </div>
+      </div>
+    );
+  }
+
+  if (authStatus === "unauthorized") return null;
+
+  // --- CRUD ---
+  const handleViewUser = (user: User) => {
+    setSelectedUser(user);
+    setModalMode("view");
+    setShowModal(true);
+  };
+
+  const handleAddUser = () => {
+    setSelectedUser(null);
+    setModalMode("add");
+    setShowModal(true);
+  };
+
+  // --------------------------
+  //   OTP PARA EDITAR
+  // --------------------------
+  const handleEditUser = async (user: User) => {
+    try {
+      const otpRes = await fetch("/api/auth/send-edit-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ correo: user.correo }),
       });
 
-    const userData: any = { nombre, correo, cedula, rol };
+      const otpData = await otpRes.json();
+      if (!otpRes.ok || !otpData.ok) return alert("Error enviando OTP");
 
-    if ((mode === "add" || (mode === "edit" && password)) && password) {
-      userData.password = password;
-    }
-
-    if (fotoAsesor) userData.foto_asesor = await toBase64(fotoAsesor);
-    if (cedulaFrontal) userData.cedula_frontal = await toBase64(cedulaFrontal);
-    if (cedulaReverso) userData.cedula_reverso = await toBase64(cedulaReverso);
-
-    try {
-      if (mode === "add" && onAddUser) await onAddUser(userData);
-      if (mode === "edit" && onEditUser)
-        await onEditUser({ ...userData, id: user.id });
-      onClose();
-    } catch (err) {
-      console.error(err);
-      alert("Error guardando usuario");
+      setOtpUser(user);
+      setOtpInput("");
+      setOtpError("");
+      setShowOtpModal(true);
+    } catch {
+      alert("Error enviando OTP");
     }
   };
 
-  // ---------------- RENDER HELPERS ----------------
-  const renderInput = (
-    label: string,
-    value: string,
-    setValue: (v: string) => void,
-    field: keyof typeof locked,
-    type: string = "text",
-    icon?: React.ReactNode
+  const handleVerifyOtp = async () => {
+    if (!otpUser) return;
 
-  ) => (
-    <div className="flex items-center gap-2 bg-gray-800 rounded-lg p-2">
-      {icon}
-      <input
-        type={type}
-        placeholder={label}
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        className={`bg-transparent w-full outline-none text-white ${
-          locked[field] ? "opacity-60 cursor-not-allowed" : ""
-        }`}
-        disabled={locked[field]}
-      />
-      {mode === "edit" && (
-        <button type="button" onClick={() => toggleLock(field)}>
-          {locked[field] ? (
-            <Lock className="w-5 h-5 text-gray-400" />
-          ) : (
-            <Unlock className="w-5 h-5 text-green-400" />
-          )}
-        </button>
-      )}
-    </div>
-  );
+    try {
+      const verifyRes = await fetch("/api/auth/verify-edit-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          correo: otpUser.correo,
+          otp: otpInput,
+        }),
+      });
 
-  const renderFileInput = (
-    label: string,
-    file: File | null,
-    setter: (f: File | null) => void,
-    field: keyof typeof locked,
-    existingUrl?: string
-  ) => (
-    <div className="flex flex-col items-center gap-2">
-      <label
-        className={`w-24 h-24 border border-gray-700 rounded-lg flex items-center justify-center bg-gray-800 overflow-hidden cursor-pointer ${
-          locked[field] ? "opacity-60 cursor-not-allowed" : ""
-        }`}
-      >
-        {file ? (
-          <img
-            src={URL.createObjectURL(file)}
-            alt={label}
-            className="w-full h-full object-cover"
-          />
-        ) : existingUrl ? (
-          <img
-            src={existingUrl}
-            alt={label}
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <span className="text-gray-400 text-center">{label}</span>
-        )}
-        <input
-          type="file"
-          accept="image/*"
-          disabled={locked[field]}
-          onChange={handleFileChange(setter)}
-          className="hidden"
-        />
-      </label>
-      {mode === "edit" && (
-        <button type="button" onClick={() => toggleLock(field)}>
-          {locked[field] ? (
-            <Lock className="w-4 h-4 text-gray-400" />
-          ) : (
-            <Unlock className="w-4 h-4 text-green-400" />
-          )}
-        </button>
-      )}
-    </div>
-  );
+      const verifyData = await verifyRes.json();
 
-  // ---------------- RENDER ----------------
+      if (!verifyRes.ok || !verifyData.ok)
+        return setOtpError("OTP inválido o expirado");
+
+      setSelectedUser(otpUser);
+      setModalMode("edit");
+      setShowModal(true);
+      setShowOtpModal(false);
+    } catch {
+      setOtpError("Error verificando OTP");
+    }
+  };
+
+  // --------------------------
+  //    OTP PARA ELIMINAR
+  // --------------------------
+  const handleDeleteUser = async (user: User) => {
+    try {
+      const otpRes = await fetch("/api/auth/send-delete-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ correo: user.correo }),
+      });
+
+      const otpData = await otpRes.json();
+      if (!otpRes.ok || !otpData.ok) return alert("Error enviando OTP");
+
+      const inputOtp = prompt(
+        `Se envió un código de 6 dígitos al correo ${user.correo}. Ingresa el OTP:`
+      );
+      if (!inputOtp) return;
+
+      const delRes = await fetch("/api/users/delete", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ correo: user.correo, otp: inputOtp }),
+      });
+
+      const delData = await delRes.json();
+
+      if (!delRes.ok || !delData.ok) return alert("OTP inválido o expirado");
+
+      alert("Usuario eliminado exitosamente");
+      cargarUsuarios();
+    } catch {
+      alert("Error eliminando usuario");
+    }
+  };
+
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-black/70 backdrop-blur-sm z-50">
-      <div className="bg-gray-900 border border-gray-800 rounded-xl p-8 w-full max-w-lg shadow-xl">
-        <h2 className="text-xl font-semibold mb-6 text-center">
-          {mode === "add" ? "🆕 Nuevo Usuario" : `✏️ Editar Usuario`}
-        </h2>
+    <div
+      className="min-h-screen text-white"
+      style={{
+        backgroundImage: "url('/fondo-bg.png')",
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        backgroundRepeat: "no-repeat",
+        backgroundAttachment: "fixed",
+      }}
+    >
+      <div className="min-h-screen w-full bg-black/60">
+        <div className="relative flex min-h-screen">
+          {/* Si tu Sidebar no recibe props, déjalo como <Sidebar /> */}
+          <Sidebar />
 
-        <div className="space-y-4">
-          {renderInput(
-            "Nombre completo",
-            nombre,
-            setNombre,
-            "nombre",
-            "text",
-            <User className="w-5 h-5 text-gray-400" />
-          )}
+          <main className="flex-1 p-4 md:p-8">
+            {/* Header */}
+            <div className="mb-6 rounded-3xl border border-white/10 bg-white/5 backdrop-blur-2xl shadow-2xl p-4">
+              <div className="flex flex-wrap justify-between items-center gap-3">
+                <div className="flex items-center gap-4">
+                  <button
+                    onClick={() => setSidebarOpen(!sidebarOpen)}
+                    className="h-11 w-11 rounded-2xl border border-white/10 bg-white/5 backdrop-blur-2xl hover:bg-white/10 transition flex items-center justify-center"
+                    aria-label="Abrir/Cerrar sidebar"
+                  >
+                    <Menu className="w-6 h-6 text-white/90" />
+                  </button>
 
-          {renderInput(
-            "Correo",
-            correo,
-            setCorreo,
-            "correo",
-            "email",
-            <Mail className="w-5 h-5 text-gray-400" />
-          )}
+                  <h1 className="text-2xl md:text-3xl font-bold text-white/90">
+                    👥 Gestión de Asesores
+                  </h1>
+                </div>
 
-          {renderInput("Cédula", cedula, setCedula, "cedula")}
+                <button
+                  onClick={handleAddUser}
+                  className="flex items-center gap-2 h-11 px-4 rounded-full border border-emerald-400/20 bg-emerald-500/90 text-black font-semibold hover:bg-emerald-500 active:scale-[0.98] transition"
+                >
+                  <PlusCircle className="w-5 h-5" />
+                  Nuevo asesor
+                </button>
+              </div>
+            </div>
 
-          {/* Rol */}
-          <div className="flex items-center gap-2 bg-gray-800 rounded-lg p-2">
-            <select
-              className={`w-full bg-gray-800 text-white p-2 rounded outline-none ${
-                locked.rol ? "opacity-60 cursor-not-allowed" : ""
-              }`}
-              value={rol}
-              onChange={(e) => setRol(e.target.value)}
-              disabled={locked.rol}
+            {/* Filtros */}
+            <div className="mb-6 rounded-3xl border border-white/10 bg-white/5 backdrop-blur-2xl shadow-2xl p-4">
+              <div className="flex flex-wrap gap-4">
+                <div className="flex flex-col gap-1">
+                  <label className="text-sm font-semibold text-white/80">
+                    Correo:
+                  </label>
+                  <input
+                    type="text"
+                    value={filterCorreo}
+                    onChange={(e) => setFilterCorreo(e.target.value)}
+                    className="w-64 max-w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-2.5 text-sm text-white/85 placeholder:text-white/35 outline-none focus:border-emerald-400/30 focus:ring-2 focus:ring-emerald-500/15 transition"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label className="text-sm font-semibold text-white/80">
+                    Rol:
+                  </label>
+                  <select
+                    value={filterRol}
+                    onChange={(e) => setFilterRol(e.target.value)}
+                    className="w-56 max-w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-2.5 text-sm text-white/85 outline-none focus:border-emerald-400/30 focus:ring-2 focus:ring-emerald-500/15 transition"
+                  >
+                    <option value="">Todos</option>
+                    <option value="asesor">Asesor</option>
+                    <option value="admin">Administrador</option>
+                    <option value="rrhh">RRHH</option>
+                    <option value="spa">SpA</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Tabla */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.35 }}
+              className="rounded-3xl border border-white/10 bg-white/5 backdrop-blur-2xl shadow-2xl p-4 md:p-6 overflow-hidden"
             >
-              <option value="asesor">Asesor</option>
-              <option value="admin">Administrador</option>
-              <option value="rrhh">RRHH</option>
-              <option value="SpA">SpA</option>
-            </select>
+              {loading ? (
+                <p className="text-white/55">Cargando usuarios...</p>
+              ) : usuariosFiltrados.length === 0 ? (
+                <p className="text-white/55 text-center py-10">
+                  No hay asesores que coincidan con los filtros.
+                </p>
+              ) : (
+                <UsuariosTable
+                  usuarios={usuariosFiltrados}
+                  onEdit={handleEditUser}
+                  // Si tu tabla soporta esto, perfecto:
 
-            {mode === "edit" && (
-              <button type="button" onClick={() => toggleLock("rol")}>
-                {locked.rol ? (
-                  <Lock className="w-5 h-5 text-gray-400" />
-                ) : (
-                  <Unlock className="w-5 h-5 text-green-400" />
-                )}
-              </button>
-            )}
-          </div>
+                />
+              )}
+            </motion.div>
+          </main>
 
-          {/* Contraseña */}
-          {(mode === "add" || mode === "edit") && (
-            <div className="flex items-center gap-2 bg-gray-800 rounded-lg p-2">
-              <input
-                type="text"
-                placeholder="Contraseña"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className={`bg-transparent w-full outline-none text-white ${
-                  locked.password ? "opacity-60 cursor-not-allowed" : ""
-                }`}
-                disabled={locked.password}
-              />
+          {/* Modal Crear/Editar/Ver */}
+          {showModal && (
+            <UsuarioModal
+              mode={modalMode}
+              user={selectedUser}
+              onClose={() => setShowModal(false)}
+              onAddUser={async (user) => {
+                await agregarUsuario(user);
+                await cargarUsuarios();
+              }}
+              onEditUser={async (user) => {
+                await editarUsuario(user);
+                await cargarUsuarios();
+              }}
+            />
+          )}
 
-              {mode === "edit" && (
-                <button type="button" onClick={() => toggleLock("password")}>
-                  {locked.password ? (
-                    <Lock className="w-5 h-5 text-gray-400" />
-                  ) : (
-                    <Unlock className="w-5 h-5 text-green-400" />
+          {/* Modal OTP editar */}
+          {showOtpModal && otpUser && (
+            <div className="fixed inset-0 flex items-center justify-center bg-black/70 backdrop-blur-sm z-50 p-4">
+              <div className="w-80 rounded-3xl border border-white/10 bg-white/5 backdrop-blur-2xl shadow-2xl overflow-hidden relative">
+                <div className="pointer-events-none absolute inset-0 bg-black/35" />
+
+                <div className="relative p-6">
+                  <h2 className="text-lg font-bold mb-3 text-center text-white/90">
+                    Ingresa el OTP enviado a
+                    <div className="text-sm font-semibold text-white/70 mt-1 break-all">
+                      {otpUser.correo}
+                    </div>
+                  </h2>
+
+                  <input
+                    type="text"
+                    value={otpInput}
+                    onChange={(e) => setOtpInput(e.target.value)}
+                    placeholder="Código OTP"
+                    className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-2.5 text-sm text-white/85 placeholder:text-white/35 outline-none focus:border-emerald-400/30 focus:ring-2 focus:ring-emerald-500/15 transition mb-2"
+                  />
+
+                  {otpError && (
+                    <p className="text-red-400 text-sm mb-2 text-center">
+                      {otpError}
+                    </p>
                   )}
-                </button>
-              )}
 
-              {!locked.password && (
-                <button
-                  type="button"
-                  onClick={generarPassword}
-                  className="text-sm bg-purple-600 hover:bg-purple-700 px-3 py-1 rounded-lg"
-                >
-                  Generar
-                </button>
-              )}
+                  <div className="flex justify-end gap-2 pt-2">
+                    <button
+                      className="px-4 py-2 rounded-2xl border border-white/10 bg-white/5 text-white/80 hover:bg-white/10 transition"
+                      onClick={() => setShowOtpModal(false)}
+                    >
+                      Cancelar
+                    </button>
 
-              {mode === "add" && (
-                <button
-                  type="button"
-                  onClick={generarPassword}
-                  className="text-sm bg-purple-600 hover:bg-purple-700 px-3 py-1 rounded-lg"
-                >
-                  Generar
-                </button>
-              )}
+                    <button
+                      className="px-4 py-2 rounded-2xl border border-emerald-400/20 bg-emerald-500/90 text-black font-semibold hover:bg-emerald-500 transition"
+                      onClick={handleVerifyOtp}
+                    >
+                      Confirmar
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
-
-          <div className="grid grid-cols-3 gap-4 mt-2">
-            {renderFileInput(
-              "Foto asesor",
-              fotoAsesor,
-              setFotoAsesor,
-              "fotoAsesor",
-              user?.foto_asesor
-            )}
-            {renderFileInput(
-              "Cédula frontal",
-              cedulaFrontal,
-              setCedulaFrontal,
-              "cedulaFrontal",
-              user?.cedula_frontal
-            )}
-            {renderFileInput(
-              "Cédula reverso",
-              cedulaReverso,
-              setCedulaReverso,
-              "cedulaReverso",
-              user?.cedula_reverso
-            )}
-          </div>
-        </div>
-
-        <div className="flex justify-end gap-3 mt-6">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-full"
-          >
-            Cancelar
-          </button>
-          <button
-            onClick={handleSubmit}
-            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-full shadow"
-          >
-            {mode === "add" ? "Crear usuario" : "Guardar cambios"}
-          </button>
         </div>
       </div>
     </div>

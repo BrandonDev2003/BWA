@@ -40,7 +40,7 @@ export default function UsuariosPage() {
   // --- Filtrado ---
   const usuariosFiltrados = useMemo(() => {
     return usuarios.filter((u) => {
-      const matchCorreo = u.correo?.includes(filterCorreo);
+      const matchCorreo = (u.correo || "").includes(filterCorreo);
       const matchRol = filterRol ? u.rol === filterRol : true;
       return matchCorreo && matchRol;
     });
@@ -68,6 +68,7 @@ export default function UsuariosPage() {
         setAuthStatus("unauthorized");
       }
     };
+
     verifyUser();
   }, []);
 
@@ -194,46 +195,25 @@ export default function UsuariosPage() {
       className="min-h-screen text-white"
       style={{
         backgroundImage: "url('/fondo-bg.png')",
-        backgroundSize: "cover", // ✅ igual que el Home (llena toda la pantalla)
+        backgroundSize: "cover",
         backgroundPosition: "center",
         backgroundRepeat: "no-repeat",
         backgroundAttachment: "fixed",
       }}
     >
-      {/* overlay para legibilidad */}
       <div className="min-h-screen w-full bg-black/60">
-        {/* ✅ NO overflow-hidden aquí (deja scrollear la página) */}
         <div className="relative flex min-h-screen">
+          {/* Si tu Sidebar no recibe props, déjalo como <Sidebar /> */}
           <Sidebar />
 
-          {/* main con scroll natural */}
           <main className="flex-1 p-4 md:p-8">
             {/* Header */}
-            <div
-              className="
-                mb-6
-                rounded-3xl
-                border border-white/10
-                bg-white/5
-                backdrop-blur-2xl
-                shadow-2xl
-                p-4
-              "
-            >
+            <div className="mb-6 rounded-3xl border border-white/10 bg-white/5 backdrop-blur-2xl shadow-2xl p-4">
               <div className="flex flex-wrap justify-between items-center gap-3">
                 <div className="flex items-center gap-4">
                   <button
                     onClick={() => setSidebarOpen(!sidebarOpen)}
-                    className="
-                      h-11 w-11
-                      rounded-2xl
-                      border border-white/10
-                      bg-white/5
-                      backdrop-blur-2xl
-                      hover:bg-white/10
-                      transition
-                      flex items-center justify-center
-                    "
+                    className="h-11 w-11 rounded-2xl border border-white/10 bg-white/5 backdrop-blur-2xl hover:bg-white/10 transition flex items-center justify-center"
                     aria-label="Abrir/Cerrar sidebar"
                   >
                     <Menu className="w-6 h-6 text-white/90" />
@@ -246,18 +226,7 @@ export default function UsuariosPage() {
 
                 <button
                   onClick={handleAddUser}
-                  className="
-                    flex items-center gap-2
-                    h-11
-                    px-4
-                    rounded-full
-                    border border-emerald-400/20
-                    bg-emerald-500/90
-                    text-black font-semibold
-                    hover:bg-emerald-500
-                    active:scale-[0.98]
-                    transition
-                  "
+                  className="flex items-center gap-2 h-11 px-4 rounded-full border border-emerald-400/20 bg-emerald-500/90 text-black font-semibold hover:bg-emerald-500 active:scale-[0.98] transition"
                 >
                   <PlusCircle className="w-5 h-5" />
                   Nuevo asesor
@@ -266,17 +235,7 @@ export default function UsuariosPage() {
             </div>
 
             {/* Filtros */}
-            <div
-              className="
-                mb-6
-                rounded-3xl
-                border border-white/10
-                bg-white/5
-                backdrop-blur-2xl
-                shadow-2xl
-                p-4
-              "
-            >
+            <div className="mb-6 rounded-3xl border border-white/10 bg-white/5 backdrop-blur-2xl shadow-2xl p-4">
               <div className="flex flex-wrap gap-4">
                 <div className="flex flex-col gap-1">
                   <label className="text-sm font-semibold text-white/80">
@@ -286,17 +245,7 @@ export default function UsuariosPage() {
                     type="text"
                     value={filterCorreo}
                     onChange={(e) => setFilterCorreo(e.target.value)}
-                    className="
-                      w-64 max-w-full
-                      rounded-2xl
-                      border border-white/10
-                      bg-black/25
-                      px-4 py-2.5
-                      text-sm text-white/85 placeholder:text-white/35
-                      outline-none
-                      focus:border-emerald-400/30 focus:ring-2 focus:ring-emerald-500/15
-                      transition
-                    "
+                    className="w-64 max-w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-2.5 text-sm text-white/85 placeholder:text-white/35 outline-none focus:border-emerald-400/30 focus:ring-2 focus:ring-emerald-500/15 transition"
                   />
                 </div>
 
@@ -307,23 +256,13 @@ export default function UsuariosPage() {
                   <select
                     value={filterRol}
                     onChange={(e) => setFilterRol(e.target.value)}
-                    className="
-                      w-56 max-w-full
-                      rounded-2xl
-                      border border-white/10
-                      bg-black/25
-                      px-4 py-2.5
-                      text-sm text-white/85
-                      outline-none
-                      focus:border-emerald-400/30 focus:ring-2 focus:ring-emerald-500/15
-                      transition
-                    "
+                    className="w-56 max-w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-2.5 text-sm text-white/85 outline-none focus:border-emerald-400/30 focus:ring-2 focus:ring-emerald-500/15 transition"
                   >
                     <option value="">Todos</option>
                     <option value="asesor">Asesor</option>
                     <option value="admin">Administrador</option>
                     <option value="rrhh">RRHH</option>
-                    <option value="SpA">SpA</option>
+                    <option value="spa">SpA</option>
                   </select>
                 </div>
               </div>
@@ -334,15 +273,7 @@ export default function UsuariosPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.35 }}
-              className="
-                rounded-3xl
-                border border-white/10
-                bg-white/5
-                backdrop-blur-2xl
-                shadow-2xl
-                p-4 md:p-6
-                overflow-hidden
-              "
+              className="rounded-3xl border border-white/10 bg-white/5 backdrop-blur-2xl shadow-2xl p-4 md:p-6 overflow-hidden"
             >
               {loading ? (
                 <p className="text-white/55">Cargando usuarios...</p>
@@ -352,24 +283,29 @@ export default function UsuariosPage() {
                 </p>
               ) : (
                 <UsuariosTable
-                  usuarios={usuariosFiltrados} 
+                  usuarios={usuariosFiltrados}
                   onEdit={handleEditUser}
-
+                  // Si tu tabla soporta esto, perfecto:
+                
+                 
                 />
               )}
             </motion.div>
           </main>
 
-          {/* Modal Crear/Editar */}
+          {/* Modal Crear/Editar/Ver */}
           {showModal && (
             <UsuarioModal
               mode={modalMode}
               user={selectedUser}
               onClose={() => setShowModal(false)}
-              onAddUser={agregarUsuario}
+              onAddUser={async (user) => {
+                await agregarUsuario(user);
+                await cargarUsuarios();
+              }}
               onEditUser={async (user) => {
                 await editarUsuario(user);
-                cargarUsuarios();
+                await cargarUsuarios();
               }}
             />
           )}
@@ -393,18 +329,7 @@ export default function UsuariosPage() {
                     value={otpInput}
                     onChange={(e) => setOtpInput(e.target.value)}
                     placeholder="Código OTP"
-                    className="
-                      w-full
-                      rounded-2xl
-                      border border-white/10
-                      bg-black/25
-                      px-4 py-2.5
-                      text-sm text-white/85 placeholder:text-white/35
-                      outline-none
-                      focus:border-emerald-400/30 focus:ring-2 focus:ring-emerald-500/15
-                      transition
-                      mb-2
-                    "
+                    className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-2.5 text-sm text-white/85 placeholder:text-white/35 outline-none focus:border-emerald-400/30 focus:ring-2 focus:ring-emerald-500/15 transition mb-2"
                   />
 
                   {otpError && (
@@ -415,25 +340,14 @@ export default function UsuariosPage() {
 
                   <div className="flex justify-end gap-2 pt-2">
                     <button
-                      className="
-                        px-4 py-2 rounded-2xl
-                        border border-white/10 bg-white/5
-                        text-white/80 hover:bg-white/10
-                        transition
-                      "
+                      className="px-4 py-2 rounded-2xl border border-white/10 bg-white/5 text-white/80 hover:bg-white/10 transition"
                       onClick={() => setShowOtpModal(false)}
                     >
                       Cancelar
                     </button>
 
                     <button
-                      className="
-                        px-4 py-2 rounded-2xl
-                        border border-emerald-400/20
-                        bg-emerald-500/90 text-black font-semibold
-                        hover:bg-emerald-500
-                        transition
-                      "
+                      className="px-4 py-2 rounded-2xl border border-emerald-400/20 bg-emerald-500/90 text-black font-semibold hover:bg-emerald-500 transition"
                       onClick={handleVerifyOtp}
                     >
                       Confirmar

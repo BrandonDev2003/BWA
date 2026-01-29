@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
-import path from "path";
-import { mkdir, writeFile } from "fs/promises";
-import { randomUUID } from "crypto";
+import cloudinary from "@/lib/cloudinary";
 
 export const runtime = "nodejs";
 
+// ✅ Mantengo tus campos permitidos
 const ALLOWED_FIELDS = [
   "hoja_vida",
   "copia_cedula",
@@ -26,6 +25,24 @@ const ALLOWED_FIELDS = [
 
 type AllowedField = (typeof ALLOWED_FIELDS)[number];
 
+// ✅ Para no llenar Cloudinary con PDFs enormes sin querer, limita tamaño (ej 10MB)
+const MAX_BYTES = 10 * 1024 * 1024;
+
+// ✅ Opcional: permitir pdf + imágenes
+const ALLOWED_MIME = new Set([
+  "application/pdf",
+  "image/png",
+  "image/jpeg",
+  "image/jpg",
+  "image/webp",
+]);
+
+function mimeToResourceType(mime: string): "image" | "raw" {
+  // PDF debe ir como raw en Cloudinary
+  if (mime === "application/pdf") return "raw";
+  return "image";
+}
+
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
@@ -35,26 +52,64 @@ export async function POST(req: NextRequest) {
     const file = formData.get("file");
 
     if (!userId || !fieldRaw || !(file instanceof File)) {
-      return NextResponse.json({ ok: false, error: "Datos incompletos" }, { status: 400 });
+      return NextResponse.json(
+        { ok: false, error: "Datos incompletos" },
+        { status: 400 }
+      );
     }
 
     if (!ALLOWED_FIELDS.includes(fieldRaw as AllowedField)) {
-      return NextResponse.json({ ok: false, error: "Campo inválido" }, { status: 400 });
+      return NextResponse.json(
+        { ok: false, error: "Campo inválido" },
+        { status: 400 }
+      );
     }
 
     const field = fieldRaw as AllowedField;
 
-    const buffer = Buffer.from(await file.arrayBuffer());
-    const ext = path.extname(file.name || "").toLowerCase();
-    const safeExt = ext && ext.length <= 10 ? ext : "";
-    const filename = `${field}-${randomUUID()}${safeExt}`;
+    // Validaciones básicas
+    if (file.size > MAX_BYTES) {
+      return NextResponse.json(
+        { ok: false, error: "Archivo demasiado grande (máx 10MB)" },
+        { status: 400 }
+      );
+    }
 
-    const dir = path.join(process.cwd(), "public", "uploads", "requisitos", String(userId));
-    await mkdir(dir, { recursive: true });
-    await writeFile(path.join(dir, filename), buffer);
+    if (!ALLOWED_MIME.has(file.type)) {
+      return NextResponse.json(
+        { ok: false, error: `Tipo de archivo no permitido: ${file.type}` },
+        { status: 400 }
+      );
+    }
 
-    const url = `/uploads/requisitos/${userId}/${filename}`;
+    // Convertir a buffer
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
 
+    // Subir a Cloudinary
+    const resourceType = mimeToResourceType(file.type);
+
+    const uploadResult = await new Promise<any>((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream(
+        {
+          folder: `requisitos/${userId}`,
+          resource_type: resourceType, // image o raw
+          // nombre "bonito" sin necesidad de uuid aquí (Cloudinary lo maneja)
+          public_id: `${field}-${Date.now()}`,
+          overwrite: true, // si sube de nuevo el mismo campo, reemplaza
+        },
+        (error, result) => {
+          if (error) reject(error);
+          else resolve(result);
+        }
+      );
+
+      stream.end(buffer);
+    });
+
+    const url: string = uploadResult.secure_url;
+
+    // Asegurar fila
     await pool.query(
       `
       INSERT INTO requisitos_usuario (user_id)
@@ -64,6 +119,7 @@ export async function POST(req: NextRequest) {
       [userId]
     );
 
+    // ⚠️ OJO: el nombre de columna viene de lista blanca, es seguro interpolar
     const result = await pool.query(
       `
       UPDATE requisitos_usuario
@@ -76,8 +132,11 @@ export async function POST(req: NextRequest) {
     );
 
     return NextResponse.json({ ok: true, url, data: result.rows[0] });
-  } catch (e) {
+  } catch (e: any) {
     console.error("UPLOAD ERROR:", e);
-    return NextResponse.json({ ok: false, error: "Error interno" }, { status: 500 });
+    return NextResponse.json(
+      { ok: false, error: e?.message || "Error interno" },
+      { status: 500 }
+    );
   }
 }
