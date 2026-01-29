@@ -82,6 +82,7 @@ export default function UsuarioModal({ onClose, onSave, user }: UsuarioModalProp
         >
           <option value="asesor">Asesor</option>
           <option value="admin">Administrador</option>
+          <option value="admin">RRHH</option>
         </select>
 
         {/* Password */}

@@ -39,6 +39,7 @@ export default function LoginPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ correo, password }),
+        credentials: "include", // ✅ importante si tu backend setea cookie session
       });
 
       const data = await res.json();
@@ -50,13 +51,27 @@ export default function LoginPage() {
 
       if (data.token) localStorage.setItem("token", data.token);
 
-      router.push(data.user.rol === "admin" ? "/leads" : "/leadsgestion");
+      const rol = String(data?.user?.rol || "").toLowerCase();
+
+    if (rol === "SpA" || rol === "super-admin" || rol === "spa") {
+      router.replace("/SpA/home");
+    } else if (rol === "admin" || rol === "administrador") {
+      router.replace("/Ventas/home");
+    } else if (rol === "rrhh") {
+      router.replace("/rrhh/home");
+    } else if (rol === "asesor") {
+      router.replace("/Asesor/home");
+    } else {
+      router.replace("/usuarios/home");
+    }
+
     } catch (err) {
       setError("Error de conexión con el servidor");
     } finally {
       setLoading(false);
     }
   };
+
 
   return (
     <div className="w-full h-screen bg-black flex">

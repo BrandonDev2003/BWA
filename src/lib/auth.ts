@@ -1,7 +1,8 @@
 import bcrypt from "bcrypt";
-import jwt, { JwtPayload } from "jsonwebtoken";
+import jwt, { JwtPayload, SignOptions, Secret } from "jsonwebtoken";
+import { cookies } from "next/headers";
 
-const JWT_SECRET = process.env.JWT_SECRET!;
+const JWT_SECRET = process.env.JWT_SECRET as Secret;
 
 export interface UserPayload extends JwtPayload {
   id: number;
@@ -23,7 +24,8 @@ export async function hashPassword(password: string) {
 
 // 🎫 Firmar JWT
 export function signToken(payload: Omit<UserPayload, keyof JwtPayload>) {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || "7d" });
+  const expiresIn = (process.env.JWT_EXPIRES_IN ?? "7d") as SignOptions["expiresIn"];
+  return jwt.sign(payload, JWT_SECRET, { expiresIn });
 }
 
 // 🧩 Verificar JWT
@@ -32,8 +34,24 @@ export function verifyToken(token: string): UserPayload | null {
     const decoded = jwt.verify(token, JWT_SECRET);
     if (typeof decoded === "string") return null;
     return decoded as UserPayload;
-  } catch (err) {
-    console.error("Error verificando token:", err);
+  } catch {
     return null;
   }
+}
+
+/**
+ * ✅ Retorna sesión mínima: { userId }
+ * Asume que guardas el JWT en una cookie llamada "token"
+ * (si tu cookie se llama diferente, cambia el nombre aquí)
+ */
+export async function getUserSession(): Promise<{ userId: number } | null> {
+  const cookieStore = await cookies(); // ✅ aquí el fix
+  const token = cookieStore.get("token")?.value;
+
+  if (!token) return null;
+
+  const decoded = verifyToken(token);
+  if (!decoded?.id) return null;
+
+  return { userId: decoded.id };
 }

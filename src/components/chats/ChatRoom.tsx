@@ -1,27 +1,38 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { socket } from "@/lib/socketClient";
+import { useEffect, useMemo, useState } from "react";
+import { getSocket } from "@/lib/socketClient";
 
 export default function ChatRoom({ chatId, userId }: any) {
   const [messages, setMessages] = useState<any[]>([]);
   const [text, setText] = useState("");
 
-  useEffect(() => {
-    socket.connect();
-    socket.emit("join-chat", chatId);
+  const s = useMemo(() => getSocket(userId), [userId]);
 
-    socket.on("new-message", (msg) => {
+  useEffect(() => {
+    if (!s) return;
+
+    s.connect();
+    s.emit("join-chat", chatId);
+
+    const onNewMessage = (msg: any) => {
       setMessages((prev) => [...prev, msg]);
-    });
+    };
+
+    s.on("new-message", onNewMessage);
 
     return () => {
-      socket.disconnect();
+      s.off("new-message", onNewMessage);
+      s.emit("leave-chat", chatId);
+      // no desconectes globalmente si lo usas en otras pantallas
+      // s.disconnect();
     };
-  }, [chatId]);
+  }, [s, chatId]);
 
   function sendMessage() {
-    socket.emit("send-message", {
+    if (!s || !text.trim()) return;
+
+    s.emit("send-message", {
       chatId,
       senderId: userId,
       content: text,
@@ -37,10 +48,7 @@ export default function ChatRoom({ chatId, userId }: any) {
         ))}
       </div>
 
-      <input
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-      />
+      <input value={text} onChange={(e) => setText(e.target.value)} />
       <button onClick={sendMessage}>Enviar</button>
     </div>
   );

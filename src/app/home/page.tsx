@@ -44,7 +44,7 @@ type Post = {
 };
 
 function isAdminRole(rol?: string | null) {
-  return rol === "admin" || rol === "administrador" || rol === "Administrador";
+  return rol === "admin" || rol === "administrador" || rol === "Administrador" || rol  === "SpA" || rol === "SPA" || rol === "spa";;
 }
 
 function UsersTooltip({ users }: { users?: string[] }) {
@@ -93,7 +93,7 @@ export default function HomePage() {
 
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [docFile, setDocFile] = useState<File | null>(null);
-
+  
   const [commentDraft, setCommentDraft] = useState<Record<number, string>>({});
   const [openComments, setOpenComments] = useState<Record<number, boolean>>({});
 
@@ -258,7 +258,7 @@ export default function HomePage() {
 
       {/* ✅ wrapper sin h-screen: sidebar se mueve con la página */}
       <div className="relative flex min-h-screen">
-        <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} />
+
 
         {openReactFor !== null && (
           <div

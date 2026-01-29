@@ -40,7 +40,7 @@ export default function UsuariosPage() {
   // --- Filtrado ---
   const usuariosFiltrados = useMemo(() => {
     return usuarios.filter((u) => {
-      const matchCorreo = u.correo?.includes(filterCorreo);
+      const matchCorreo = (u.correo || "").includes(filterCorreo);
       const matchRol = filterRol ? u.rol === filterRol : true;
       return matchCorreo && matchRol;
     });
@@ -56,8 +56,8 @@ export default function UsuariosPage() {
         if (
           data.ok &&
           (data.user.rol === "admin" ||
-            data.user.rol === "Administrador" ||
-            data.user.rol === "RRHH")
+            data.user.rol === "spa" ||
+            data.user.rol === "rrhh")
         ) {
           setUserRol(data.user.rol);
           setAuthStatus("authorized");
@@ -68,6 +68,7 @@ export default function UsuariosPage() {
         setAuthStatus("unauthorized");
       }
     };
+
     verifyUser();
   }, []);
 
@@ -180,8 +181,7 @@ export default function UsuariosPage() {
 
       const delData = await delRes.json();
 
-      if (!delRes.ok || !delData.ok)
-        return alert("OTP inválido o expirado");
+      if (!delRes.ok || !delData.ok) return alert("OTP inválido o expirado");
 
       alert("Usuario eliminado exitosamente");
       cargarUsuarios();
@@ -191,252 +191,172 @@ export default function UsuariosPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0B0D10] text-white">
-      {/* Fondo bloom */}
-      <div className="pointer-events-none fixed inset-0">
-        <div className="min-h-screen bg-[radial-gradient(900px_circle_at_20%_10%,rgba(59,130,246,0.22),transparent_60%),radial-gradient(900px_circle_at_80%_20%,rgba(245,158,11,0.18),transparent_55%),linear-gradient(135deg,#070b1a_0%,#081a3a_45%,#3a2a07_100%)]"></div>
-      </div>
+    <div
+      className="min-h-screen text-white"
+      style={{
+        backgroundImage: "url('/fondo-bg.png')",
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        backgroundRepeat: "no-repeat",
+        backgroundAttachment: "fixed",
+      }}
+    >
+      <div className="min-h-screen w-full bg-black/60">
+        <div className="relative flex min-h-screen">
+          {/* Si tu Sidebar no recibe props, déjalo como <Sidebar /> */}
+          <Sidebar />
 
-      {/* ✅ NO overflow-hidden aquí (deja scrollear la página) */}
-      <div className="relative flex min-h-screen">
-        <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} />
+          <main className="flex-1 p-4 md:p-8">
+            {/* Header */}
+            <div className="mb-6 rounded-3xl border border-white/10 bg-white/5 backdrop-blur-2xl shadow-2xl p-4">
+              <div className="flex flex-wrap justify-between items-center gap-3">
+                <div className="flex items-center gap-4">
+                  <button
+                    onClick={() => setSidebarOpen(!sidebarOpen)}
+                    className="h-11 w-11 rounded-2xl border border-white/10 bg-white/5 backdrop-blur-2xl hover:bg-white/10 transition flex items-center justify-center"
+                    aria-label="Abrir/Cerrar sidebar"
+                  >
+                    <Menu className="w-6 h-6 text-white/90" />
+                  </button>
 
-        {/* main con scroll natural */}
-        <main className="flex-1 p-4 md:p-8">
-          {/* Header */}
-          <div
-            className="
-              mb-6
-              rounded-3xl
-              border border-white/10
-              bg-white/5
-              backdrop-blur-2xl
-              shadow-2xl
-              p-4
-            "
-          >
-            <div className="flex flex-wrap justify-between items-center gap-3">
-              <div className="flex items-center gap-4">
+                  <h1 className="text-2xl md:text-3xl font-bold text-white/90">
+                    👥 Gestión de Asesores
+                  </h1>
+                </div>
+
                 <button
-                  onClick={() => setSidebarOpen(!sidebarOpen)}
-                  className="
-                    h-11 w-11
-                    rounded-2xl
-                    border border-white/10
-                    bg-white/5
-                    backdrop-blur-2xl
-                    hover:bg-white/10
-                    transition
-                    flex items-center justify-center
-                  "
-                  aria-label="Abrir/Cerrar sidebar"
+                  onClick={handleAddUser}
+                  className="flex items-center gap-2 h-11 px-4 rounded-full border border-emerald-400/20 bg-emerald-500/90 text-black font-semibold hover:bg-emerald-500 active:scale-[0.98] transition"
                 >
-                  <Menu className="w-6 h-6 text-white/90" />
+                  <PlusCircle className="w-5 h-5" />
+                  Nuevo asesor
                 </button>
-
-                <h1 className="text-2xl md:text-3xl font-bold text-white/90">
-                  👥 Gestión de Asesores
-                </h1>
-              </div>
-
-              <button
-                onClick={handleAddUser}
-                className="
-                  flex items-center gap-2
-                  h-11
-                  px-4
-                  rounded-full
-                  border border-emerald-400/20
-                  bg-emerald-500/90
-                  text-black font-semibold
-                  hover:bg-emerald-500
-                  active:scale-[0.98]
-                  transition
-                "
-              >
-                <PlusCircle className="w-5 h-5" />
-                Nuevo asesor
-              </button>
-            </div>
-          </div>
-
-          {/* Filtros */}
-          <div
-            className="
-              mb-6
-              rounded-3xl
-              border border-white/10
-              bg-white/5
-              backdrop-blur-2xl
-              shadow-2xl
-              p-4
-            "
-          >
-            <div className="flex flex-wrap gap-4">
-              <div className="flex flex-col gap-1">
-                <label className="text-sm font-semibold text-white/80">
-                  Correo:
-                </label>
-                <input
-                  type="text"
-                  value={filterCorreo}
-                  onChange={(e) => setFilterCorreo(e.target.value)}
-                  className="
-                    w-64 max-w-full
-                    rounded-2xl
-                    border border-white/10
-                    bg-black/25
-                    px-4 py-2.5
-                    text-sm text-white/85 placeholder:text-white/35
-                    outline-none
-                    focus:border-emerald-400/30 focus:ring-2 focus:ring-emerald-500/15
-                    transition
-                  "
-                />
-              </div>
-
-              <div className="flex flex-col gap-1">
-                <label className="text-sm font-semibold text-white/80">
-                  Rol:
-                </label>
-                <select
-                  value={filterRol}
-                  onChange={(e) => setFilterRol(e.target.value)}
-                  className="
-                    w-56 max-w-full
-                    rounded-2xl
-                    border border-white/10
-                    bg-black/25
-                    px-4 py-2.5
-                    text-sm text-white/85
-                    outline-none
-                    focus:border-emerald-400/30 focus:ring-2 focus:ring-emerald-500/15
-                    transition
-                  "
-                >
-                  <option value="">Todos</option>
-                  <option value="asesor">Asesor</option>
-                  <option value="admin">Administrador</option>
-                </select>
               </div>
             </div>
-          </div>
 
-          {/* Tabla */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.35 }}
-            className="
-              rounded-3xl
-              border border-white/10
-              bg-white/5
-              backdrop-blur-2xl
-              shadow-2xl
-              p-4 md:p-6
-              overflow-hidden
-            "
-          >
-            {loading ? (
-              <p className="text-white/55">Cargando usuarios...</p>
-            ) : usuariosFiltrados.length === 0 ? (
-              <p className="text-white/55 text-center py-10">
-                No hay asesores que coincidan con los filtros.
-              </p>
-            ) : (
-              <UsuariosTable
-                usuarios={usuariosFiltrados}
-                onView={handleViewUser}
-                onEdit={handleEditUser}
-                onDelete={handleDeleteUser}
-              />
-            )}
-          </motion.div>
-        </main>
+            {/* Filtros */}
+            <div className="mb-6 rounded-3xl border border-white/10 bg-white/5 backdrop-blur-2xl shadow-2xl p-4">
+              <div className="flex flex-wrap gap-4">
+                <div className="flex flex-col gap-1">
+                  <label className="text-sm font-semibold text-white/80">
+                    Correo:
+                  </label>
+                  <input
+                    type="text"
+                    value={filterCorreo}
+                    onChange={(e) => setFilterCorreo(e.target.value)}
+                    className="w-64 max-w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-2.5 text-sm text-white/85 placeholder:text-white/35 outline-none focus:border-emerald-400/30 focus:ring-2 focus:ring-emerald-500/15 transition"
+                  />
+                </div>
 
-        {/* Modal Crear/Editar */}
-        {showModal && (
-          <UsuarioModal
-            mode={modalMode}
-            user={selectedUser}
-            onClose={() => setShowModal(false)}
-            onAddUser={agregarUsuario}
-            onEditUser={async (user) => {
-              await editarUsuario(user);
-              cargarUsuarios();
-            }}
-          />
-        )}
-
-        {/* Modal OTP editar */}
-        {showOtpModal && otpUser && (
-          <div className="fixed inset-0 flex items-center justify-center bg-black/70 backdrop-blur-sm z-50 p-4">
-            <div className="w-80 rounded-3xl border border-white/10 bg-white/5 backdrop-blur-2xl shadow-2xl overflow-hidden relative">
-              <div className="pointer-events-none absolute inset-0 bg-black/35" />
-
-              <div className="relative p-6">
-                <h2 className="text-lg font-bold mb-3 text-center text-white/90">
-                  Ingresa el OTP enviado a
-                  <div className="text-sm font-semibold text-white/70 mt-1 break-all">
-                    {otpUser.correo}
-                  </div>
-                </h2>
-
-                <input
-                  type="text"
-                  value={otpInput}
-                  onChange={(e) => setOtpInput(e.target.value)}
-                  placeholder="Código OTP"
-                  className="
-                    w-full
-                    rounded-2xl
-                    border border-white/10
-                    bg-black/25
-                    px-4 py-2.5
-                    text-sm text-white/85 placeholder:text-white/35
-                    outline-none
-                    focus:border-emerald-400/30 focus:ring-2 focus:ring-emerald-500/15
-                    transition
-                    mb-2
-                  "
-                />
-
-                {otpError && (
-                  <p className="text-red-400 text-sm mb-2 text-center">
-                    {otpError}
-                  </p>
-                )}
-
-                <div className="flex justify-end gap-2 pt-2">
-                  <button
-                    className="
-                      px-4 py-2 rounded-2xl
-                      border border-white/10 bg-white/5
-                      text-white/80 hover:bg-white/10
-                      transition
-                    "
-                    onClick={() => setShowOtpModal(false)}
+                <div className="flex flex-col gap-1">
+                  <label className="text-sm font-semibold text-white/80">
+                    Rol:
+                  </label>
+                  <select
+                    value={filterRol}
+                    onChange={(e) => setFilterRol(e.target.value)}
+                    className="w-56 max-w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-2.5 text-sm text-white/85 outline-none focus:border-emerald-400/30 focus:ring-2 focus:ring-emerald-500/15 transition"
                   >
-                    Cancelar
-                  </button>
-
-                  <button
-                    className="
-                      px-4 py-2 rounded-2xl
-                      border border-emerald-400/20
-                      bg-emerald-500/90 text-black font-semibold
-                      hover:bg-emerald-500
-                      transition
-                    "
-                    onClick={handleVerifyOtp}
-                  >
-                    Confirmar
-                  </button>
+                    <option value="">Todos</option>
+                    <option value="asesor">Asesor</option>
+                    <option value="admin">Administrador</option>
+                    <option value="rrhh">RRHH</option>
+                    <option value="spa">SpA</option>
+                  </select>
                 </div>
               </div>
             </div>
-          </div>
-        )}
+
+            {/* Tabla */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.35 }}
+              className="rounded-3xl border border-white/10 bg-white/5 backdrop-blur-2xl shadow-2xl p-4 md:p-6 overflow-hidden"
+            >
+              {loading ? (
+                <p className="text-white/55">Cargando usuarios...</p>
+              ) : usuariosFiltrados.length === 0 ? (
+                <p className="text-white/55 text-center py-10">
+                  No hay asesores que coincidan con los filtros.
+                </p>
+              ) : (
+                <UsuariosTable
+                  usuarios={usuariosFiltrados}
+                  onEdit={handleEditUser}
+                  // Si tu tabla soporta esto, perfecto:
+
+                />
+              )}
+            </motion.div>
+          </main>
+
+          {/* Modal Crear/Editar/Ver */}
+          {showModal && (
+            <UsuarioModal
+              mode={modalMode}
+              user={selectedUser}
+              onClose={() => setShowModal(false)}
+              onAddUser={async (user) => {
+                await agregarUsuario(user);
+                await cargarUsuarios();
+              }}
+              onEditUser={async (user) => {
+                await editarUsuario(user);
+                await cargarUsuarios();
+              }}
+            />
+          )}
+
+          {/* Modal OTP editar */}
+          {showOtpModal && otpUser && (
+            <div className="fixed inset-0 flex items-center justify-center bg-black/70 backdrop-blur-sm z-50 p-4">
+              <div className="w-80 rounded-3xl border border-white/10 bg-white/5 backdrop-blur-2xl shadow-2xl overflow-hidden relative">
+                <div className="pointer-events-none absolute inset-0 bg-black/35" />
+
+                <div className="relative p-6">
+                  <h2 className="text-lg font-bold mb-3 text-center text-white/90">
+                    Ingresa el OTP enviado a
+                    <div className="text-sm font-semibold text-white/70 mt-1 break-all">
+                      {otpUser.correo}
+                    </div>
+                  </h2>
+
+                  <input
+                    type="text"
+                    value={otpInput}
+                    onChange={(e) => setOtpInput(e.target.value)}
+                    placeholder="Código OTP"
+                    className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-2.5 text-sm text-white/85 placeholder:text-white/35 outline-none focus:border-emerald-400/30 focus:ring-2 focus:ring-emerald-500/15 transition mb-2"
+                  />
+
+                  {otpError && (
+                    <p className="text-red-400 text-sm mb-2 text-center">
+                      {otpError}
+                    </p>
+                  )}
+
+                  <div className="flex justify-end gap-2 pt-2">
+                    <button
+                      className="px-4 py-2 rounded-2xl border border-white/10 bg-white/5 text-white/80 hover:bg-white/10 transition"
+                      onClick={() => setShowOtpModal(false)}
+                    >
+                      Cancelar
+                    </button>
+
+                    <button
+                      className="px-4 py-2 rounded-2xl border border-emerald-400/20 bg-emerald-500/90 text-black font-semibold hover:bg-emerald-500 transition"
+                      onClick={handleVerifyOtp}
+                    >
+                      Confirmar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

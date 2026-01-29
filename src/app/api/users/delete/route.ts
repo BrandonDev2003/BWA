@@ -1,73 +1,72 @@
-// src/app/api/auth/send-delete-otp/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import nodemailer from "nodemailer";
-import { pool } from "@/lib/db";
-console.log("ENV_CHECK", {
-  HOST: process.env.SMTP_HOST,
-  PORT: process.env.SMTP_PORT,
-  USER: process.env.SMTP_USER,
-  PASS: process.env.SMTP_PASS,
-});
+import pool from "@/lib/db";
 
+export async function DELETE(req: NextRequest) {
+  const client = await pool.connect();
 
-export async function POST(req: NextRequest) {
   try {
-    // 1. Obtener correo desde cookie (igual que edit)
-    const otpCorreo = req.cookies.get("otp_correo")?.value;
+    const body = await req.json().catch(() => ({}));
+    const { correo, otp } = body as { correo?: string; otp?: string };
 
-    if (!otpCorreo) {
+    if (!correo || !otp) {
       return NextResponse.json(
-        { error: "No se encontró el correo en la sesión" },
+        { ok: false, error: "Correo y OTP requeridos" },
         { status: 400 }
       );
     }
 
-    // 2. Verificar usuario
-    const userQuery = await pool.query(
-      "SELECT * FROM users WHERE correo = $1",
-      [otpCorreo]
+    // ✅ Validar OTP guardado en memoria
+    const saved = globalThis.DELETE_OTPS?.[correo];
+    if (!saved || saved !== otp) {
+      return NextResponse.json(
+        { ok: false, error: "OTP inválido o expirado" },
+        { status: 401 }
+      );
+    }
+
+    // ✅ Buscar el usuario por correo para obtener su ID
+    const userRes = await client.query(
+      "SELECT id FROM users WHERE correo = $1",
+      [correo]
     );
 
-    if (userQuery.rows.length === 0) {
+    const id = userRes.rows[0]?.id;
+
+    if (!id) {
       return NextResponse.json(
-        { error: "Usuario no encontrado" },
+        { ok: false, error: "Usuario no encontrado" },
         { status: 404 }
       );
     }
 
-    // 3. Generar OTP
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    await client.query("BEGIN");
 
-    // 4. Guardar OTP en memoria temporal (igual que edit)
-    globalThis.DELETE_OTPS = globalThis.DELETE_OTPS || {};
-    globalThis.DELETE_OTPS[otpCorreo] = otp;
+    // ✅ Borrar mensajes
+    await client.query("DELETE FROM messages WHERE sender_id = $1", [id]);
+    // Si tienes receiver_id, descomenta:
+    // await client.query("DELETE FROM messages WHERE receiver_id = $1", [id]);
 
-    // 5. Transportador SMTP (igual que edit)
-    const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: Number(process.env.SMTP_PORT),
-      secure: true,
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-      },
-    });
+    // ✅ Borrar usuario
+    await client.query("DELETE FROM users WHERE id = $1", [id]);
 
-    // 6. Enviar correo
-    await transporter.sendMail({
-      from: `"Gestión Leads" <${process.env.SMTP_USER}>`,
-      to: otpCorreo,
-      subject: "Código OTP para eliminar usuario",
-      text: `Tu código para eliminar tu cuenta es: ${otp}`,
-      html: `<p>Tu código para eliminar tu cuenta es: <b>${otp}</b></p>`,
-    });
+    await client.query("COMMIT");
 
-    return NextResponse.json({ ok: true, message: "OTP enviado" });
-  } catch (error) {
-    console.error("Error enviando OTP:", error);
+    // ✅ limpiar OTP
+    if (globalThis.DELETE_OTPS) delete globalThis.DELETE_OTPS[correo];
+
+    return NextResponse.json({ ok: true, message: "Usuario eliminado" });
+  } catch (error: any) {
+    try {
+      await client.query("ROLLBACK");
+    } catch {}
+
+    console.error("Error eliminando usuario:", error);
+
     return NextResponse.json(
-      { error: "Error enviando OTP" },
+      { ok: false, error: "Error eliminando usuario", detail: error?.detail || String(error) },
       { status: 500 }
     );
+  } finally {
+    client.release();
   }
 }

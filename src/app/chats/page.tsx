@@ -5,6 +5,8 @@ import { io, Socket } from "socket.io-client";
 import Sidebar from "./components/sidebar/Sidebar";
 import ChatSidebar from "./components/sidebar/ChatSidebar";
 import ChatHistory from "./components/chat/ChatHistory";
+import type { Message as PageMessage } from "./page";
+
 import ChatInput from "./components/chat/ChatInput";
 
 // ================== TIPOS ==================
@@ -185,7 +187,7 @@ export default function ChatsPage() {
 
   if (authStatus === "loading") {
     return (
-      <div className="h-screen grid place-items-center bg-[#0B0D10] text-white">
+      <div className="h-screen grid place-items-center bg-black text-white">
         <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl px-6 py-4 shadow-2xl">
           Cargando…
         </div>
@@ -196,67 +198,81 @@ export default function ChatsPage() {
   if (authStatus === "unauthorized") return null;
 
   return (
-    <div className="h-screen overflow-hidden bg-[#0B0D10] text-white">
-      <div className="relative flex h-full">
-        <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} />
+    <div
+      className="h-screen overflow-hidden text-white"
+      style={{
+        backgroundImage: "url('/fondo-bg.png')",
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        backgroundRepeat: "no-repeat",
+      }}
+    >
+      {/* Overlay para que se lea el texto */}
+      <div className="h-full w-full bg-black/55">
+        <div className="relative flex h-full">
 
-        <main className="flex-1 h-full overflow-hidden p-4 md:p-6">
-          <div className="flex h-full gap-4">
-            <aside className="w-80 shrink-0 h-full rounded-3xl border border-white/10 bg-white/5 backdrop-blur-2xl shadow-2xl overflow-hidden">
-              <div className="h-full bg-black/25">
-                <ChatSidebar
-                  userId={userId}
-                  onSelectChat={(chat) => {
-                    setActiveChat(chat);
-                    setMessages([]);
-                  }}
-                />
-              </div>
-            </aside>
 
-            <section className="flex-1 h-full flex flex-col rounded-3xl border border-white/10 bg-white/5 backdrop-blur-2xl shadow-2xl overflow-hidden min-h-0">
-              {!activeChat ? (
-                <div className="flex flex-1 items-center justify-center text-white/45">
-                  Selecciona un chat
-                </div>
-              ) : (
-                <>
-                  <div className="shrink-0 h-14 flex items-center px-4 border-b border-white/10 bg-black/25">
-                    <div className="font-semibold text-white/90">
-                      {activeChat.name}
-                    </div>
-                  </div>
-
-                  <div
-                    className="flex-1 min-h-0 overflow-hidden"
-                    style={{
-                      backgroundImage: "url('/chat-bg.png')",
-                      backgroundSize: "cover",
-                      backgroundPosition: "center",
+          <main className="flex-1 h-full overflow-hidden p-4 md:p-6">
+            <div className="flex h-full gap-4">
+              <aside className="w-80 shrink-0 h-full rounded-3xl border border-white/10 bg-white/5 backdrop-blur-2xl shadow-2xl overflow-hidden">
+                <div className="h-full bg-black/25">
+                  <ChatSidebar
+                    userId={userId}
+                    onSelectChat={(chat) => {
+                      setActiveChat(chat);
+                      setMessages([]);
                     }}
-                  >
-                    <div className="h-full w-full bg-black/30">
-                      <ChatHistory
-                      messages={messages}
-                      userId={userId}
-                      chatId={activeChat.id}
-                      setMessages={setMessages}
-                    />
-                    </div>
-                  </div>
+                  />
+                </div>
+              </aside>
 
-                  <div className="shrink-0 border-t border-white/10 bg-black/20">
-                    <ChatInput
-                      onSendText={sendText}
-                      onSendImage={sendImage}
-                      onSendFile={sendFile}
-                    />
+              <section className="flex-1 h-full flex flex-col rounded-3xl border border-white/10 bg-white/5 backdrop-blur-2xl shadow-2xl overflow-hidden min-h-0">
+                {!activeChat ? (
+                  <div className="flex flex-1 items-center justify-center text-white/45">
+                    Selecciona un chat
                   </div>
-                </>
-              )}
-            </section>
-          </div>
-        </main>
+                ) : (
+                  <>
+                    <div className="shrink-0 h-14 flex items-center px-4 border-b border-white/10 bg-black/25">
+                      <div className="font-semibold text-white/90">
+                        {activeChat.name}
+                      </div>
+                    </div>
+
+                    {/* ✅ BG de imagen solo en el área del chat */}
+                    <div
+                      className="flex-1 min-h-0 overflow-hidden"
+                      style={{
+                        backgroundImage: "url('/chat-bg.png')",
+                        backgroundSize: "cover",
+                        backgroundPosition: "center",
+                        backgroundRepeat: "no-repeat",
+                      }}
+                    >
+                      <div className="h-full w-full bg-black/35">
+                        <ChatHistory
+                          messages={messages as any}
+                          userId={userId}
+                          chatId={activeChat.id}
+                          setMessages={setMessages as any}
+                        />
+
+                      </div>
+                    </div>
+
+                    <div className="shrink-0 border-t border-white/10 bg-black/25">
+                      <ChatInput
+                        onSendText={sendText}
+                        onSendImage={sendImage}
+                        onSendFile={sendFile}
+                      />
+                    </div>
+                  </>
+                )}
+              </section>
+            </div>
+          </main>
+        </div>
       </div>
     </div>
   );

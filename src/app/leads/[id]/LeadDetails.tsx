@@ -13,9 +13,11 @@ export interface Lead {
   asignado_a?: string | null;
 }
 
-import { Lead } from "@/types/Lead";
+import type { Lead as LeadType } from "@/types/Lead";
 
-export function LeadDetails({ lead }: { lead: Lead }) {
+
+export function LeadDetails({ lead }: { lead: LeadType }) {
+
   return (
     <section className="bg-gray-100 border border-gray-300 rounded-xl p-6 shadow-sm">
       <h2 className="text-2xl font-semibold mb-4 text-black">Detalles del Lead</h2>

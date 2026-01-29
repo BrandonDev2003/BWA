@@ -22,10 +22,11 @@ export default function LeadTable() {
   } = useLeads();
 
   // 🔹 NORMALIZAR ESTADO: "nuevo" → "pendiente"
-  const leadsNormalizados = leads.map((l) => ({
-    ...l,
-    estado: l.estado === "Nuevo" ? "pendiente" : l.estado,
-  }));
+  const leadsNormalizados = (leads as any[]).map((l) => {
+    l.estado = l.estado === "Nuevo" ? "pendiente" : l.estado;
+    return l;
+  });
+
 
   // 🔹 Filtrar por estado ya normalizado
   const leadsFiltrados = leadsNormalizados.filter((l) =>
@@ -118,7 +119,7 @@ export default function LeadTable() {
         {selectedLeads.length > 0 && (
           <button
             onClick={() => {
-              fetchUsers();
+
               setShowAssignUsers(true);
             }}
             className="
@@ -287,8 +288,8 @@ export default function LeadTable() {
         isOpen={showAssignUsers}
         onAssign={handleAssign}
         onClose={() => setShowAssignUsers(false)}
-        users={users}
       />
+
     </div>
   );
 }

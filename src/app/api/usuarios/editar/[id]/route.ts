@@ -1,69 +1,119 @@
 import { NextRequest, NextResponse } from "next/server";
-import bcrypt from "bcrypt";
-import { pool } from "@/lib/db";
+import pool from "@/lib/db";
+import bcrypt from "bcryptjs";
 
-export async function PUT(req: NextRequest) {
+export async function PUT(
+  req: NextRequest,
+  ctx: { params: Promise<{ id: string }> }
+) {
   try {
-    // Extraemos el id desde la URL
-    const url = new URL(req.url);
-    const segments = url.pathname.split("/");
-    const id = segments[segments.length - 1]; // último segmento
+    const { id: idParam } = await ctx.params;
+    const id = Number(idParam);
 
-    if (!id) {
-      return NextResponse.json({ error: "ID no proporcionado" }, { status: 400 });
+    if (!id || Number.isNaN(id)) {
+      return NextResponse.json({ error: "ID inválido" }, { status: 400 });
     }
 
     const body = await req.json();
+    const {
+      nombre,
+      correo,
+      rol,
+      cedula,
+      permiso_ver_todo,
+      password, // puede venir o no
+      foto_asesor,
+      cedula_frontal,
+      cedula_reverso,
+    } = body;
 
-    const allowedFields = [
-      "nombre",
-      "correo",
-      "cedula",
-      "rol",
-      "password",
-      "foto_asesor",
-      "cedula_frontal",
-      "cedula_reverso",
-    ];
-
-    const fieldsToUpdate: string[] = [];
-    const values: any[] = [];
-
-    for (const field of allowedFields) {
-      if (body[field] !== undefined && body[field] !== null) {
-        if (field === "password" && body[field].trim() !== "") {
-          const hashed = await bcrypt.hash(body[field], 10);
-          fieldsToUpdate.push(field);
-          values.push(hashed);
-        } else if (field !== "password") {
-          fieldsToUpdate.push(field);
-          values.push(body[field]);
-        }
-      }
-    }
-
-    if (fieldsToUpdate.length === 0) {
+    if (!nombre || !correo || !rol) {
       return NextResponse.json(
-        { error: "No hay campos para actualizar" },
+        { error: "Faltan campos requeridos (nombre, correo, rol)" },
         { status: 400 }
       );
     }
 
-    const setClause = fieldsToUpdate.map((f, i) => `${f}=$${i + 1}`).join(", ");
-    const query = `UPDATE users SET ${setClause} WHERE id=$${values.length + 1} RETURNING *`;
-    values.push(id);
+    const permiso = !!permiso_ver_todo;
 
-    const result = await pool.query(query, values);
-
-    if (result.rows.length === 0) {
-      return NextResponse.json({ error: "Usuario no encontrado" }, { status: 404 });
+    // ✅ Si mandan password, la hasheamos antes de guardar
+    let hashedPassword: string | null = null;
+    if (password && typeof password === "string" && password.trim().length > 0) {
+      hashedPassword = await bcrypt.hash(password, 10);
     }
 
-    return NextResponse.json(result.rows[0], { status: 200 });
-  } catch (err: any) {
-    console.error("Error real actualizando usuario:", err);
+    if (hashedPassword) {
+      await pool.query(
+        `
+        UPDATE users
+        SET nombre = $1,
+            correo = $2,
+            rol = $3,
+            cedula = $4,
+            permiso_ver_todo = $5,
+            password = $6,
+            foto_asesor = COALESCE($7, foto_asesor),
+            cedula_frontal = COALESCE($8, cedula_frontal),
+            cedula_reverso = COALESCE($9, cedula_reverso)
+        WHERE id = $10
+        `,
+        [
+          nombre,
+          correo,
+          rol,
+          cedula || null,
+          permiso,
+          hashedPassword,
+          foto_asesor || null,
+          cedula_frontal || null,
+          cedula_reverso || null,
+          id,
+        ]
+      );
+    } else {
+      await pool.query(
+        `
+        UPDATE users
+        SET nombre = $1,
+            correo = $2,
+            rol = $3,
+            cedula = $4,
+            permiso_ver_todo = $5,
+            foto_asesor = COALESCE($6, foto_asesor),
+            cedula_frontal = COALESCE($7, cedula_frontal),
+            cedula_reverso = COALESCE($8, cedula_reverso)
+        WHERE id = $9
+        `,
+        [
+          nombre,
+          correo,
+          rol,
+          cedula || null,
+          permiso,
+          foto_asesor || null,
+          cedula_frontal || null,
+          cedula_reverso || null,
+          id,
+        ]
+      );
+    }
+
+    const result: any = await pool.query("SELECT * FROM users WHERE id = $1", [
+      id,
+    ]);
+
+    if (!result.rows || result.rows.length === 0) {
+      return NextResponse.json(
+        { error: "Usuario no encontrado" },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({ ok: true, user: result.rows[0] }, { status: 200 });
+  } catch (error: any) {
+    console.error("Error editando usuario:", error);
     return NextResponse.json(
-      { error: err.message || "Error actualizando usuario" },
+      { error: "Error interno editando usuario" },
       { status: 500 }
     );
   }

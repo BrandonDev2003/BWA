@@ -10,7 +10,9 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const user = await verifyToken(req);
+    const token = req.cookies.get("token")?.value || "";
+    const user = await verifyToken(token);
+
     if (!user) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
@@ -37,7 +39,6 @@ export async function GET(
       [leadId]
     );
 
-    // Con pg, el resultado viene en notes.rows
     return NextResponse.json(notes.rows);
   } catch (err) {
     console.error("Error al obtener notas:", err);
@@ -56,7 +57,9 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const user = await verifyToken(req);
+    const token = req.cookies.get("token")?.value || "";
+    const user = await verifyToken(token);
+
     if (!user) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }

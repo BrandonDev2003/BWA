@@ -201,7 +201,7 @@ export default function ChatHistory({
                           <button
                             onClick={() => {
                               if (m.content?.toLowerCase().endsWith(".pdf")) {
-                                setPdfPreview(m.url);
+                                setPdfPreview(m.url ?? null);
                               } else {
                                 window.open(m.url, "_blank");
                               }

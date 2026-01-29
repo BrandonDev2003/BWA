@@ -34,8 +34,7 @@ export default function LeadRow({
 
   const estadoNormalizado = lead.estado === "Nuevo" ? "pendiente" : lead.estado;
 
-  const rowBase =
-    "border-t border-white/10 cursor-pointer transition-colors";
+  const rowBase = "border-t border-white/10 cursor-pointer transition-colors";
   const rowState = selected
     ? "bg-emerald-500/10 hover:bg-emerald-500/15"
     : "hover:bg-white/5";
@@ -45,10 +44,7 @@ export default function LeadRow({
 
   return (
     <>
-      <tr
-        className={`${rowBase} ${rowState}`}
-        onClick={() => setOpen(!open)}
-      >
+      <tr className={`${rowBase} ${rowState}`} onClick={() => setOpen(!open)}>
         {/* Checkbox */}
         <td className="p-2 text-center">
           <input
@@ -58,11 +54,7 @@ export default function LeadRow({
               e.stopPropagation();
               toggleSelect(lead.id);
             }}
-            className="
-              h-4 w-4
-              accent-emerald-400
-              cursor-pointer
-            "
+            className="h-4 w-4 accent-emerald-400 cursor-pointer"
           />
         </td>
 
@@ -85,6 +77,7 @@ export default function LeadRow({
               const NuevoEstado =
                 e.target.value === "pendiente" ? "pendiente" : e.target.value;
               await onEstadoChange(lead.id, NuevoEstado);
+              onRefresh();
             }}
             onClick={(e) => e.stopPropagation()}
             className="
@@ -102,9 +95,15 @@ export default function LeadRow({
               transition
             "
           >
-            <option className="bg-[#0B0D10]" value="pendiente">Pendiente</option>
-            <option className="bg-[#0B0D10]" value="contactado">Contactado</option>
-            <option className="bg-[#0B0D10]" value="cerrado">Cerrado</option>
+            <option className="bg-[#0B0D10]" value="pendiente">
+              Pendiente
+            </option>
+            <option className="bg-[#0B0D10]" value="contactado">
+              Contactado
+            </option>
+            <option className="bg-[#0B0D10]" value="cerrado">
+              Cerrado
+            </option>
           </select>
         </td>
 
@@ -179,9 +178,7 @@ export default function LeadRow({
                 </div>
 
                 <div className="md:col-span-2 mt-2">
-                  <div className="text-white/80 font-semibold mb-2">
-                    Notas
-                  </div>
+                  <div className="text-white/80 font-semibold mb-2">Notas</div>
 
                   {lead.notas && lead.notas.length > 0 ? (
                     <div className="space-y-2">
@@ -196,10 +193,12 @@ export default function LeadRow({
                           "
                         >
                           <div className="text-xs text-white/45 mb-1">
-                            {new Date(n.fecha_creacion).toLocaleString()}
+                            {n.fecha_hora
+                              ? new Date(n.fecha_hora).toLocaleString()
+                              : "-"}
                           </div>
                           <div className="text-sm text-white/80">
-                            {n.comentario}
+                            {n.contenido ?? "-"}
                           </div>
                         </div>
                       ))}

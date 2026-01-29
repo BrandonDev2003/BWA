@@ -1,10 +1,26 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Sidebar from "./components/Sidebar";
 
 export default function DashboardPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen grid place-items-center bg-[#0B0D10] text-white">
+          <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl px-6 py-4 shadow-2xl">
+            Cargando dashboard...
+          </div>
+        </div>
+      }
+    >
+      <DashboardInner />
+    </Suspense>
+  );
+}
+
+function DashboardInner() {
   const router = useRouter();
   const search = useSearchParams();
   const asesorId = search.get("asesor");
@@ -15,6 +31,13 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<any>(null);
   const [loadingStats, setLoadingStats] = useState(true);
   const [openSidebar, setOpenSidebar] = useState(true);
+
+  // ✅ Redirect SIN hooks condicionales
+  useEffect(() => {
+    if (authStatus === "unauthorized") {
+      router.replace("/login");
+    }
+  }, [authStatus, router]);
 
   /* -----------------------------
         VALIDACIÓN DE SESIÓN
@@ -48,26 +71,26 @@ export default function DashboardPage() {
   ------------------------------ */
   useEffect(() => {
     if (authStatus !== "authorized") return;
+
+    const cargarStats = async () => {
+      try {
+        setLoadingStats(true);
+        const url = asesorId
+          ? `/api/dashboard/stats?asesor=${asesorId}`
+          : "/api/dashboard/stats";
+
+        const res = await fetch(url, { cache: "no-store" });
+        const data = await res.json();
+        setStats(data);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoadingStats(false);
+      }
+    };
+
     cargarStats();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authStatus, asesorId]);
-
-  const cargarStats = async () => {
-    try {
-      setLoadingStats(true);
-      const url = asesorId
-        ? `/api/dashboard/stats?asesor=${asesorId}`
-        : "/api/dashboard/stats";
-
-      const res = await fetch(url, { cache: "no-store" });
-      const data = await res.json();
-      setStats(data);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoadingStats(false);
-    }
-  };
 
   /* -----------------------------
               ESTADOS
@@ -83,8 +106,7 @@ export default function DashboardPage() {
   }
 
   if (authStatus === "unauthorized") {
-    router.replace("/login");
-    return null;
+    return null; // el useEffect de arriba se encarga del redirect
   }
 
   if (loadingStats || !stats) {
@@ -97,9 +119,6 @@ export default function DashboardPage() {
     );
   }
 
-  /* -----------------------------
-          INTERFAZ COMPLETA
-  ------------------------------ */
   return (
     <div className="min-h-screen bg-[#0B0D10] text-white">
       {/* Fondo con bloom sutil */}
@@ -109,12 +128,10 @@ export default function DashboardPage() {
         <div className="absolute bottom-[-10rem] left-[-8rem] h-[34rem] w-[34rem] rounded-full bg-slate-400/10 blur-3xl" />
       </div>
 
-      {/* ✅ sin h-screen: el sidebar se mueve con el scroll */}
       <div className="relative flex min-h-screen">
-        {/* SIDEBAR */}
-        <Sidebar open={openSidebar} setOpen={setOpenSidebar} />
+        {/* SIDEBAR (ajusta props según tu componente real) */}
+        {/* <Sidebar open={openSidebar} setOpen={setOpenSidebar} /> */}
 
-        {/* CONTENIDO PRINCIPAL (sin overflow-y-auto) */}
         <div className="flex-1 p-6 md:p-8">
           <div className="mb-6">
             <h1 className="text-2xl md:text-4xl font-semibold text-white">
@@ -128,7 +145,6 @@ export default function DashboardPage() {
             </p>
           </div>
 
-          {/* === CONTADORES === */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 md:gap-6 mb-8">
             <StatCard title="Total Leads" value={stats.total} tone="info" />
             <StatCard title="Pendientes" value={stats.pendientes} tone="warn" />
@@ -136,20 +152,16 @@ export default function DashboardPage() {
             <StatCard title="Cerrados" value={stats.cerrados} tone="ok" />
           </div>
 
-          {/* === GESTIONADOS === */}
           <div className="rounded-3xl border border-white/10 bg-white/5 backdrop-blur-2xl shadow-2xl p-6 mb-6 overflow-hidden relative">
             <div className="pointer-events-none absolute inset-0 bg-black/25" />
             <div className="relative">
               <h2 className="text-lg font-semibold text-white/85 mb-3">
                 Leads Gestionados
               </h2>
-              <p className="text-3xl font-semibold text-white">
-                {stats.gestionados}
-              </p>
+              <p className="text-3xl font-semibold text-white">{stats.gestionados}</p>
             </div>
           </div>
 
-          {/* === GRÁFICO SIMPLE === */}
           <div className="rounded-3xl border border-white/10 bg-white/5 backdrop-blur-2xl shadow-2xl p-6 overflow-hidden relative">
             <div className="pointer-events-none absolute inset-0 bg-black/25" />
             <div className="relative">
@@ -208,13 +220,7 @@ function StatCard({
         <div className="mt-3 flex items-end justify-between gap-3">
           <p className="text-3xl font-semibold text-white">{value}</p>
           <span className={`px-3 py-1 rounded-full border text-xs font-semibold ${badge}`}>
-            {tone === "ok"
-              ? "OK"
-              : tone === "warn"
-              ? "Pend"
-              : tone === "blue"
-              ? "Cont"
-              : "Info"}
+            {tone === "ok" ? "OK" : tone === "warn" ? "Pend" : tone === "blue" ? "Cont" : "Info"}
           </span>
         </div>
       </div>

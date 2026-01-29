@@ -81,7 +81,7 @@ export default function CRMHome() {
     {/* ✅ quitamos h-screen para no “encerrar” el scroll */}
     <div className="relative flex min-h-screen">
       {/* Sidebar */}
-      <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} />
+      <Sidebar />
 
       {/* Main (scroll natural) */}
       <main className="flex-1 p-4 md:p-6">
@@ -89,7 +89,7 @@ export default function CRMHome() {
         <div className="mb-6 rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-4 shadow-2xl">
           <Header
             onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
-            onRefresh={fetchLeads}
+           
           />
         </div>
 
@@ -100,7 +100,7 @@ export default function CRMHome() {
             setFiltroEstado={setFiltroEstado}
             selectedLeads={selectedLeads}
             onAssignClick={() => {
-              fetchUsers();
+
               setShowAssignUsers(!showAssignUsers);
             }}
           />
@@ -108,17 +108,18 @@ export default function CRMHome() {
 
         {showAssignUsers && (
           <div className="mb-6 rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-4 shadow-2xl">
-            <AssignUsers users={users} onAssign={handleAssign} />
+            <AssignUsers
+              isOpen={showAssignUsers}
+              onAssign={handleAssign}
+              onClose={() => setShowAssignUsers(false)}
+            />
+
           </div>
         )}
 
         {/* Table card */}
         <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-4 shadow-2xl">
-          <LeadTable
-            leads={leads}
-            selectedLeads={selectedLeads}
-            setSelectedLeads={setSelectedLeads}
-          />
+          <LeadTable />
         </div>
 
         {/* Detalle verde */}
