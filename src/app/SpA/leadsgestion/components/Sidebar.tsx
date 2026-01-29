@@ -15,6 +15,11 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 
+type SidebarProps = {
+  open: boolean;
+  setOpen: React.Dispatch<React.SetStateAction<boolean>>;
+};
+
 type MeUser = {
   id: number;
   nombre: string;
@@ -31,8 +36,7 @@ const spaMenu = [
   { label: "Usuarios", href: "/SpA/usuarios", icon: Users },
 ];
 
-export default function SidebarSpA() {
-  const [open, setOpen] = useState(true);
+export default function SidebarSpA({ open, setOpen }: SidebarProps) {
   const [me, setMe] = useState<MeUser | null>(null);
 
   useEffect(() => {
@@ -125,13 +129,9 @@ export default function SidebarSpA() {
 
             {open && (
               <div className="leading-tight min-w-0">
-                <p className="text-sm font-semibold text-white truncate">
-                  {title}
-                </p>
+                <p className="text-sm font-semibold text-white truncate">{title}</p>
                 <p className="text-xs text-white/60 truncate">{subtitle}</p>
-                <p className="text-[11px] text-emerald-300/80 mt-1">
-                  {roleLabel}
-                </p>
+                <p className="text-[11px] text-emerald-300/80 mt-1">{roleLabel}</p>
               </div>
             )}
           </div>
@@ -155,13 +155,7 @@ export default function SidebarSpA() {
         {/* SALIR */}
         <div className="relative z-10 px-2 pb-4">
           <div className="my-3 h-px w-full bg-white/10" />
-          <SidebarItem
-            icon={<LogOut size={20} />}
-            text="Salir"
-            href="/login"
-            open={open}
-            danger
-          />
+          <SidebarItem icon={<LogOut size={20} />} text="Salir" href="/login" open={open} danger />
         </div>
 
         <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-px bg-emerald-500/15" />

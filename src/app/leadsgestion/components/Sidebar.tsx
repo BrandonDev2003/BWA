@@ -1,9 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import React from "react";
 import { motion } from "framer-motion";
 import {
-  Home,
   MessageSquare,
   Mail,
   Users,
@@ -14,18 +13,20 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 
+type SidebarProps = {
+  open: boolean;
+  setOpen: React.Dispatch<React.SetStateAction<boolean>>;
+};
+
 const adminMenu = [
-  { label: "Inicio", href: "/home", icon:  Home },
+  { label: "Inicio", href: "/home", icon: Server },
   { label: "Dashboard", href: "/dashboard", icon: Server },
   { label: "Chats", href: "/chats", icon: MessageSquare },
   { label: "Leads", href: "/leads", icon: Mail },
   { label: "Usuarios", href: "/usuarios", icon: Users },
-  
 ];
 
-export default function SidebarAdmin() {
-  const [open, setOpen] = useState(true);
-
+export default function Sidebar({ open, setOpen }: SidebarProps) {
   return (
     <motion.aside
       animate={{ width: open ? 240 : 76 }}
@@ -38,8 +39,6 @@ export default function SidebarAdmin() {
         bg-white/5
         backdrop-blur-2xl
         shadow-2xl
-
-        /* ✅ esto hace que NO sea fijo y se mueva con la página */
         min-h-[calc(100vh-2rem)]
       "
     >

@@ -26,8 +26,10 @@ export default function LeadsGestion() {
   const [error, setError] = useState<string | null>(null);
 
   const [filtro, setFiltro] = useState<"todos" | "pendiente" | "contactado" | "cerrado">("todos");
-
   const [openForm, setOpenForm] = useState(false);
+
+  // ✅ Sidebar state (para props open / setOpen)
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // ✅ Ecuador por defecto
   const [form, setForm] = useState({
@@ -139,9 +141,18 @@ export default function LeadsGestion() {
 
   return (
     <div className="flex min-h-screen">
-      <Sidebar />
+      {/* ✅ Sidebar con props requeridas */}
+      <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} />
 
       <div className="flex-1 p-6">
+        {/* ✅ Botón para abrir sidebar en móvil (opcional) */}
+        <button
+          className="md:hidden mb-4 px-4 py-2 rounded-xl bg-white/10 text-white border border-white/10"
+          onClick={() => setSidebarOpen(true)}
+        >
+          ☰ Menú
+        </button>
+
         <div className="flex items-center justify-between gap-4 mb-6">
           <h1 className="text-2xl font-bold text-white">Gestión de Leads del Asesor</h1>
 
@@ -295,10 +306,18 @@ export default function LeadsGestion() {
                       setForm((f) => ({ ...f, estado: e.target.value as Lead["estado"] }))
                     }
                   >
-                    <option value="Nuevo" className="text-black">Nuevo</option>
-                    <option value="Contactado" className="text-black">Contactado</option>
-                    <option value="En Proceso" className="text-black">En Proceso</option>
-                    <option value="Cerrado" className="text-black">Cerrado</option>
+                    <option value="Nuevo" className="text-black">
+                      Nuevo
+                    </option>
+                    <option value="Contactado" className="text-black">
+                      Contactado
+                    </option>
+                    <option value="En Proceso" className="text-black">
+                      En Proceso
+                    </option>
+                    <option value="Cerrado" className="text-black">
+                      Cerrado
+                    </option>
                   </select>
                 </div>
 
@@ -444,4 +463,3 @@ function InputNumber({
     </div>
   );
 }
-    
