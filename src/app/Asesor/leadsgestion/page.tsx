@@ -1,7 +1,10 @@
 "use client";
-import { useEffect, useState } from "react";
+
+import React, { useEffect, useMemo, useState } from "react";
 import LeadCard from "./components/LeadCard";
 import Sidebar from "./components/Sidebar";
+
+type EstadoLead = "Nuevo" | "Contactado" | "En Proceso" | "Cerrado";
 
 interface Lead {
   id?: number;
@@ -11,12 +14,107 @@ interface Lead {
   apellido?: string;
   telefono?: string;
   correo?: string;
-  estado?: "Nuevo" | "Contactado" | "En Proceso" | "Cerrado";
+
+  // 👇 puede venir sucio desde API (null o string raro)
+  estado?: EstadoLead | string | null;
+
   codigo_pais?: string;
   pais?: string;
   meses_inversion?: number;
   monto_inversion?: number;
+
+  // opcional si tu API lo manda
+  empresa?: string;
+
   [key: string]: any;
+}
+
+type LeadCardLead = {
+  [key: string]: any;
+  id?: number;
+  nombre?: string;
+  telefono?: string;
+  estado?: EstadoLead;
+  correo?: string;
+  empresa?: string;
+};
+
+const estadosFiltro = ["todos", "pendiente", "contactado", "cerrado"] as const;
+type EstadoFiltro = (typeof estadosFiltro)[number];
+
+// ---------------------------
+// ✅ normaliza estado para LeadCard
+// ---------------------------
+function safeEstado(v: any): EstadoLead | undefined {
+  const s = String(v ?? "")
+    .trim()
+    .toLowerCase()
+    .replaceAll("_", " ")
+    .replace(/\s+/g, " ");
+
+  if (!s) return undefined;
+
+  if (s === "nuevo" || s.includes("nuevo")) return "Nuevo";
+  if (s === "contactado" || s === "contactada" || s.includes("contact")) return "Contactado";
+  if (s === "en proceso" || s.includes("proceso") || s.includes("seguimiento") || s.includes("negoci"))
+    return "En Proceso";
+  if (s === "cerrado" || s === "cerrada" || s.includes("cerrad") || s.includes("closed") || s.includes("won"))
+    return "Cerrado";
+
+  return undefined;
+}
+
+// ---------------------------
+// ✅ helpers de filtro (más tolerante)
+// ---------------------------
+type Cat = "nuevo" | "en_proceso" | "contactado" | "cerrado" | "otro";
+
+function norm(v: any) {
+  return String(v ?? "")
+    .trim()
+    .toLowerCase()
+    .replaceAll("_", " ")
+    .replace(/\s+/g, " ");
+}
+
+function categoriaEstado(estadoRaw: any): Cat {
+  const s = norm(estadoRaw);
+
+  if (
+    s === "cerrado" ||
+    s === "cerrada" ||
+    s.includes("cerrad") ||
+    s.includes("closed") ||
+    s.includes("won") ||
+    s.includes("ganado") ||
+    s.includes("finaliz") ||
+    s.includes("complet")
+  )
+    return "cerrado";
+
+  if (
+    s === "contactado" ||
+    s === "contactada" ||
+    s.includes("contact") ||
+    s.includes("llamad") ||
+    s.includes("respond") ||
+    s.includes("respuesta") ||
+    s.includes("interes")
+  )
+    return "contactado";
+
+  if (
+    s === "en proceso" ||
+    s === "proceso" ||
+    s.includes("proceso") ||
+    s.includes("seguimiento") ||
+    s.includes("negoci")
+  )
+    return "en_proceso";
+
+  if (s === "nuevo" || s.includes("nuevo")) return "nuevo";
+
+  return "otro";
 }
 
 export default function LeadsGestion() {
@@ -25,11 +123,16 @@ export default function LeadsGestion() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [filtro, setFiltro] = useState<"todos" | "pendiente" | "contactado" | "cerrado">("todos");
-  const [openForm, setOpenForm] = useState(false);
+  // ✅ FIX Sidebar props
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
-  // ✅ Sidebar state (para props open / setOpen)
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  // ✅ filtro
+  const [filtroEstado, setFiltroEstado] = useState<EstadoFiltro>("todos");
+
+  // ✅ selección (si no la usas, puedes borrar)
+  const [selectedLeads, setSelectedLeads] = useState<number[]>([]);
+
+  const [openForm, setOpenForm] = useState(false);
 
   // ✅ Ecuador por defecto
   const [form, setForm] = useState({
@@ -37,13 +140,16 @@ export default function LeadsGestion() {
     apellido: "",
     telefono: "",
     correo: "",
-    estado: "Nuevo" as Lead["estado"],
+    estado: "Nuevo" as EstadoLead,
     codigo_pais: "+593",
     pais: "Ecuador",
     meses_inversion: 0,
     monto_inversion: 0,
   });
 
+  // ---------------------------
+  // ✅ cargar leads
+  // ---------------------------
   useEffect(() => {
     fetch("/api/leads/asesor", { credentials: "include" })
       .then(async (res) => {
@@ -51,6 +157,7 @@ export default function LeadsGestion() {
           window.location.href = "/login";
           return;
         }
+
         const data = await res.json().catch(() => ({}));
 
         const validLeads: Lead[] = (data.leads || []).filter(
@@ -58,11 +165,35 @@ export default function LeadsGestion() {
         );
 
         setLeads(validLeads);
+
+        // ✅ limpia selección si ya no existe el lead
+        const ids = new Set(validLeads.map((l) => l.id).filter(Boolean) as number[]);
+        setSelectedLeads((prev) => prev.filter((id) => ids.has(id)));
       })
       .catch(() => setError("Error cargando datos"))
       .finally(() => setLoading(false));
   }, []);
 
+  // ---------------------------
+  // ✅ filtro final
+  // ---------------------------
+  const leadsFiltrados = useMemo(() => {
+    return leads.filter((lead) => {
+      const cat = categoriaEstado(lead.estado);
+
+      if (filtroEstado === "todos") return true;
+
+      if (filtroEstado === "pendiente") return cat === "nuevo" || cat === "en_proceso";
+      if (filtroEstado === "contactado") return cat === "contactado";
+      if (filtroEstado === "cerrado") return cat === "cerrado";
+
+      return true;
+    });
+  }, [leads, filtroEstado]);
+
+  // ---------------------------
+  // ✅ crear lead
+  // ---------------------------
   async function crearLead() {
     if (!form.nombre.trim() || !form.telefono.trim()) {
       alert("⚠ Nombre y Teléfono son obligatorios");
@@ -87,8 +218,8 @@ export default function LeadsGestion() {
           telefono: form.telefono.trim(),
           correo: form.correo.trim(),
           estado: form.estado,
-          codigo_pais: form.codigo_pais.trim(),
-          pais: form.pais.trim(),
+          codigo_pais: String(form.codigo_pais || "").trim(),
+          pais: String(form.pais || "").trim(),
           meses_inversion: Number(form.meses_inversion) || 0,
           monto_inversion: Number(form.monto_inversion) || 0,
         }),
@@ -106,7 +237,9 @@ export default function LeadsGestion() {
         return;
       }
 
-      setLeads((prev) => [data.lead, ...prev]);
+      const nuevo = data.lead as Lead;
+
+      setLeads((prev) => [nuevo, ...prev]);
 
       setForm({
         nombre: "",
@@ -128,31 +261,26 @@ export default function LeadsGestion() {
     }
   }
 
+  // ---------------------------
+  // ✅ selección (si no la usas, puedes borrar)
+  // ---------------------------
+  function toggleSelect(id?: number) {
+    if (!id) return;
+    setSelectedLeads((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [id, ...prev]));
+  }
+
+  // ---------------------------
+  // ✅ UI
+  // ---------------------------
   if (loading) return <p className="p-6 text-white/80">Cargando...</p>;
   if (error) return <p className="p-6 text-red-400">{error}</p>;
 
-  const leadsFiltrados = leads.filter((lead) => {
-    if (filtro === "todos") return true;
-    if (filtro === "pendiente") return lead.estado === "Nuevo" || lead.estado === "En Proceso";
-    if (filtro === "contactado") return lead.estado === "Contactado";
-    if (filtro === "cerrado") return lead.estado === "Cerrado";
-    return true;
-  });
-
   return (
     <div className="flex min-h-screen">
-      {/* ✅ Sidebar con props requeridas */}
+      {/* ✅ FIX: Sidebar requiere props */}
       <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} />
 
       <div className="flex-1 p-6">
-        {/* ✅ Botón para abrir sidebar en móvil (opcional) */}
-        <button
-          className="md:hidden mb-4 px-4 py-2 rounded-xl bg-white/10 text-white border border-white/10"
-          onClick={() => setSidebarOpen(true)}
-        >
-          ☰ Menú
-        </button>
-
         <div className="flex items-center justify-between gap-4 mb-6">
           <h1 className="text-2xl font-bold text-white">Gestión de Leads del Asesor</h1>
 
@@ -171,31 +299,56 @@ export default function LeadsGestion() {
           </button>
         </div>
 
-        <div className="flex gap-3 mb-6 flex-wrap">
-          <FilterBtn active={filtro === "todos"} onClick={() => setFiltro("todos")}>
-            Todos
-          </FilterBtn>
-          <FilterBtn active={filtro === "pendiente"} onClick={() => setFiltro("pendiente")}>
-            Pendientes
-          </FilterBtn>
-          <FilterBtn active={filtro === "contactado"} onClick={() => setFiltro("contactado")}>
-            Contactados
-          </FilterBtn>
-          <FilterBtn active={filtro === "cerrado"} onClick={() => setFiltro("cerrado")}>
-            Cerrados
-          </FilterBtn>
+        {/* ✅ FILTROS */}
+        <div className="flex flex-wrap items-center gap-3 mb-6">
+          <div className="flex flex-wrap gap-2">
+            <FilterBtn active={filtroEstado === "todos"} onClick={() => setFiltroEstado("todos")}>
+              Todos
+            </FilterBtn>
+            <FilterBtn active={filtroEstado === "pendiente"} onClick={() => setFiltroEstado("pendiente")}>
+              Pendientes
+            </FilterBtn>
+            <FilterBtn active={filtroEstado === "contactado"} onClick={() => setFiltroEstado("contactado")}>
+              Contactados
+            </FilterBtn>
+            <FilterBtn active={filtroEstado === "cerrado"} onClick={() => setFiltroEstado("cerrado")}>
+              Cerrados
+            </FilterBtn>
+          </div>
         </div>
 
+        {/* ✅ LISTA */}
         {leadsFiltrados.length === 0 ? (
           <p className="text-white/70">No hay leads en esta categoría.</p>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {leadsFiltrados.map((lead) => (
-              <LeadCard key={lead.id || `${lead.nombre}-${lead.telefono}-${Math.random()}`} lead={lead} />
-            ))}
+            {leadsFiltrados.map((lead) => {
+              // ✅ AQUI está el FIX del error: LeadCard NO acepta null/string en estado
+              const leadParaCard: LeadCardLead = {
+                ...lead,
+                estado: safeEstado(lead.estado),
+              };
+
+              return (
+                <div key={lead.id ?? `${lead.telefono ?? "tel"}-${lead.nombre ?? "lead"}`}>
+                  {/* Si quieres checkbox de selección, descomenta:
+                  <label className="flex items-center gap-2 mb-2 text-white/70 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={!!lead.id && selectedLeads.includes(lead.id)}
+                      onChange={() => toggleSelect(lead.id)}
+                    />
+                    Seleccionar
+                  </label>
+                  */}
+                  <LeadCard lead={leadParaCard} />
+                </div>
+              );
+            })}
           </div>
         )}
 
+        {/* ✅ MODAL NUEVO LEAD */}
         {openForm && (
           <div
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
@@ -214,9 +367,7 @@ export default function LeadsGestion() {
               <div className="flex items-start justify-between gap-4 mb-6">
                 <div>
                   <h2 className="text-xl font-semibold">Nuevo Lead</h2>
-                  <p className="text-sm text-white/60 mt-1">
-                    asignado_a y origen se guardan automáticamente.
-                  </p>
+                  <p className="text-sm text-white/60 mt-1">asignado_a y origen se guardan automáticamente.</p>
                 </div>
 
                 <button
@@ -302,9 +453,7 @@ export default function LeadsGestion() {
                       focus:outline-none focus:ring-2 focus:ring-emerald-400/60
                     "
                     value={form.estado}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, estado: e.target.value as Lead["estado"] }))
-                    }
+                    onChange={(e) => setForm((f) => ({ ...f, estado: e.target.value as EstadoLead }))}
                   >
                     <option value="Nuevo" className="text-black">
                       Nuevo
