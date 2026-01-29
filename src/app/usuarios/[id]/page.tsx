@@ -91,7 +91,7 @@ export default function UsuarioDetallePage() {
 
         if (
           data.ok &&
-          (data.user.rol === "admin" || data.user.rol === "spa")
+          (data.user.rol === "admin" || data.user.rol === "spa" || data.user.rol === "rrhh")
         ) {
           setUserRol(data.user.rol);
           setAuthStatus("authorized");
