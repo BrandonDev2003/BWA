@@ -73,7 +73,7 @@ export default function HomePage() {
   const [authStatus, setAuthStatus] = useState<
     "loading" | "authorized" | "unauthorized"
   >("loading");
-
+   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [meRol, setMeRol] = useState<string | null>(null);
   const [meId, setMeId] = useState<number | null>(null);
 
@@ -271,7 +271,7 @@ export default function HomePage() {
     >
       <div className="min-h-screen w-full bg-black/60">
         <div className="relative flex min-h-screen">
-          <Sidebar />
+          <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} />
 
           <main className="flex-1 p-6 md:p-8 relative z-10">
             <div className="max-w-3xl mx-auto space-y-6">
