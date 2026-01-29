@@ -1,472 +1,473 @@
-  "use client";
+"use client";
 
-  import { useEffect, useMemo, useState } from "react";
-  import { useParams, useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
 
-  type UrlOrNull = string | null;
+type UrlOrNull = string | null;
 
-  interface Requisitos {
-    hoja_vida: UrlOrNull;
-    copia_cedula: UrlOrNull;
-    certificado_votacion: UrlOrNull;
-    foto_carnet: UrlOrNull;
-    titulo_estudios: UrlOrNull;
-    certificados_cursos: UrlOrNull;
-    certificados_laborales: UrlOrNull;
-    certificados_honorabilidad: UrlOrNull;
-    historial_iess: UrlOrNull;
-    antecedentes_penales: UrlOrNull;
-    certificado_bancario: UrlOrNull;
-    ruc: UrlOrNull;
-    certificado_discapacidad: UrlOrNull;
-    partida_matrimonio: UrlOrNull;
-    partida_nacimiento_hijos: UrlOrNull;
-  }
+interface Requisitos {
+  hoja_vida: UrlOrNull;
+  copia_cedula: UrlOrNull;
+  certificado_votacion: UrlOrNull;
+  foto_carnet: UrlOrNull;
+  titulo_estudios: UrlOrNull;
 
-  interface UserDetail {
-    id: number;
-    nombre: string;
-    correo: string;
-    cedula: string;
-    rol: string;
-    estado_expediente: "COMPLETO" | "INCOMPLETO";
-    foto_asesor?: string;
-    cedula_frontal?: string;
-    cedula_reverso?: string;
+  certificados_cursos: UrlOrNull;
+  certificados_laborales: UrlOrNull;
+  certificados_honorabilidad: UrlOrNull;
+  historial_iess: UrlOrNull;
+  antecedentes_penales: UrlOrNull;
+  certificado_bancario: UrlOrNull;
+  ruc: UrlOrNull;
 
-    linkedin_url?: string | null;
-    facebook_url?: string | null;
-    instagram_url?: string | null;
-    tiktok_url?: string | null;
-    x_url?: string | null;
-  }
+  certificado_discapacidad: UrlOrNull;
+  partida_matrimonio: UrlOrNull;
+  partida_nacimiento_hijos: UrlOrNull;
+}
 
-  type ReqKey = keyof Requisitos;
+interface UserDetail {
+  id: number;
+  nombre: string;
+  correo: string;
+  cedula: string;
+  rol: string;
+  estado_expediente: "COMPLETO" | "INCOMPLETO";
+  foto_asesor?: string;
+  cedula_frontal?: string;
+  cedula_reverso?: string;
 
-  const OPTIONAL_REQS: ReqKey[] = [
-    "certificado_discapacidad",
-    "partida_matrimonio",
-    "partida_nacimiento_hijos",
-  ];
+  linkedin_url?: string | null;
+  facebook_url?: string | null;
+  instagram_url?: string | null;
+  tiktok_url?: string | null;
+  x_url?: string | null;
+}
 
-  export default function UsuarioDetallePage() {
-    const { id } = useParams<{ id: string }>();
-    const router = useRouter();
+type ReqKey = keyof Requisitos;
 
-    // ✅ Auth
-    const [authStatus, setAuthStatus] = useState<
-      "loading" | "authorized" | "unauthorized"
-    >("loading");
-    const [userRol, setUserRol] = useState<string | null>(null);
+const OPTIONAL_REQS: ReqKey[] = [
+  "certificado_discapacidad",
+  "partida_matrimonio",
+  "partida_nacimiento_hijos",
+];
 
-    const [user, setUser] = useState<UserDetail | null>(null);
-    const [requisitos, setRequisitos] = useState<Requisitos | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [uploading, setUploading] = useState<string | null>(null);
-    const [noAplica, setNoAplica] = useState<Record<string, boolean>>({});
+export default function UsuarioDetallePage() {
+  const { id } = useParams<{ id: string }>();
+  const router = useRouter();
 
-    // ✅ redes (form)
-    const [social, setSocial] = useState({
-      linkedin_url: "",
-      facebook_url: "",
-      instagram_url: "",
-      tiktok_url: "",
-      x_url: "",
-    });
-    const [savingSocial, setSavingSocial] = useState(false);
+  // ✅ Auth
+  const [authStatus, setAuthStatus] = useState<
+    "loading" | "authorized" | "unauthorized"
+  >("loading");
+  const [userRol, setUserRol] = useState<string | null>(null);
 
-    // ---------------------------
-    // ✅ Verificación de acceso
-    // ---------------------------
-    useEffect(() => {
-      const verifyUser = async () => {
-        try {
-          const res = await fetch("/api/auth/verify", {
-            cache: "no-store",
-            credentials: "include",
-          });
-          const data = await res.json();
+  const [user, setUser] = useState<UserDetail | null>(null);
+  const [requisitos, setRequisitos] = useState<Requisitos | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState<string | null>(null);
+  const [noAplica, setNoAplica] = useState<Record<string, boolean>>({});
 
-          if (
-            data.ok &&
-            (data.user.rol === "admin" || data.user.rol === "spa" || data.user.rol === "rrhh")
-          ) {
-            setUserRol(data.user.rol);
-            setAuthStatus("authorized");
-          } else {
-            setAuthStatus("unauthorized");
-          }
-        } catch {
-          setAuthStatus("unauthorized");
-        }
-      };
+  // ✅ redes (form)
+  const [social, setSocial] = useState({
+    linkedin_url: "",
+    facebook_url: "",
+    instagram_url: "",
+    tiktok_url: "",
+    x_url: "",
+  });
+  const [savingSocial, setSavingSocial] = useState(false);
 
-      verifyUser();
-    }, []);
-
-    // ✅ Redirección
-    useEffect(() => {
-      if (authStatus === "unauthorized") router.replace("/login");
-    }, [authStatus, router]);
-
-    // ---------------------------
-    // ✅ Cargar usuario (solo si autorizado)
-    // ---------------------------
-    const loadUser = async () => {
+  // ---------------------------
+  // ✅ Verificación de acceso
+  // ---------------------------
+  useEffect(() => {
+    const verifyUser = async () => {
       try {
-        const res = await fetch(`/api/users/${id}`, {
+        const res = await fetch("/api/auth/verify", {
           cache: "no-store",
           credentials: "include",
         });
         const data = await res.json();
 
-        if (res.ok && data.ok) {
-          setUser(data.user);
-          setRequisitos(data.requisitos);
-
-          // Inferir "no aplica" (solo opcionales)
-          const inferred: Record<string, boolean> = {};
-          OPTIONAL_REQS.forEach((k) => {
-            inferred[k] = data.requisitos?.[k] === null ? true : false;
-          });
-          setNoAplica((prev) => ({ ...inferred, ...prev }));
-
-          setSocial({
-            linkedin_url: data.user?.linkedin_url || "",
-            facebook_url: data.user?.facebook_url || "",
-            instagram_url: data.user?.instagram_url || "",
-            tiktok_url: data.user?.tiktok_url || "",
-            x_url: data.user?.x_url || "",
-          });
+        if (
+          data.ok &&
+          (data.user.rol === "admin" || data.user.rol === "spa")
+        ) {
+          setUserRol(data.user.rol);
+          setAuthStatus("authorized");
+        } else {
+          setAuthStatus("unauthorized");
         }
-      } finally {
-        setLoading(false);
+      } catch {
+        setAuthStatus("unauthorized");
       }
     };
 
-    useEffect(() => {
-      if (authStatus === "authorized") loadUser();
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [authStatus, id]);
+    verifyUser();
+  }, []);
 
-    // ---------------------------
-    // ✅ Acciones
-    // ---------------------------
-    const uploadImage = async (file: File, field: string) => {
-      setUploading(field);
+  // ✅ Redirección
+  useEffect(() => {
+    if (authStatus === "unauthorized") router.replace("/login");
+  }, [authStatus, router]);
 
-      const fd = new FormData();
-      fd.append("file", file);
-      fd.append("field", field);
-      fd.append("userId", String(id));
-
-      await fetch("/api/users/upload-image", {
-        method: "POST",
+  // ---------------------------
+  // ✅ Cargar usuario (solo si autorizado)
+  // ---------------------------
+  const loadUser = async () => {
+    try {
+      const res = await fetch(`/api/users/${id}`, {
+        cache: "no-store",
         credentials: "include",
-        body: fd,
+      });
+      const data = await res.json();
+
+      if (res.ok && data.ok) {
+        setUser(data.user);
+        setRequisitos(data.requisitos);
+
+        // Inferir "no aplica" (solo opcionales)
+        const inferred: Record<string, boolean> = {};
+        OPTIONAL_REQS.forEach((k) => {
+          inferred[k] = data.requisitos?.[k] === null ? true : false;
+        });
+        setNoAplica((prev) => ({ ...inferred, ...prev }));
+
+        setSocial({
+          linkedin_url: data.user?.linkedin_url || "",
+          facebook_url: data.user?.facebook_url || "",
+          instagram_url: data.user?.instagram_url || "",
+          tiktok_url: data.user?.tiktok_url || "",
+          x_url: data.user?.x_url || "",
+        });
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (authStatus === "authorized") loadUser();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authStatus, id]);
+
+  // ---------------------------
+  // ✅ Acciones
+  // ---------------------------
+  const uploadImage = async (file: File, field: string) => {
+    setUploading(field);
+
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("field", field);
+    fd.append("userId", String(id));
+
+    await fetch("/api/users/upload-image", {
+      method: "POST",
+      credentials: "include",
+      body: fd,
+    });
+
+    await loadUser();
+    setUploading(null);
+  };
+
+  const uploadReqFile = async (file: File, field: ReqKey) => {
+    setUploading(field);
+
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("field", field);
+    fd.append("userId", String(id));
+
+    const res = await fetch("/api/requisitos/upload-file", {
+      method: "POST",
+      credentials: "include",
+      body: fd,
+    });
+
+    const data = await res.json().catch(() => null);
+
+    if (res.ok && data?.ok && typeof data.url === "string") {
+      setRequisitos((prev) => (prev ? { ...prev, [field]: data.url } : prev));
+      setNoAplica((prev) => ({ ...prev, [field]: false }));
+    }
+
+    setUploading(null);
+  };
+
+  const toggleNoAplica = async (field: ReqKey) => {
+    const newValue = !noAplica[field];
+
+    setNoAplica((prev) => ({ ...prev, [field]: newValue }));
+    setRequisitos((prev) => (prev ? { ...prev, [field]: null } : prev));
+
+    await fetch("/api/requisitos/set-false", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ userId: id, field }),
+    });
+  };
+
+  const downloadFile = (value: unknown, field: ReqKey) => {
+    if (typeof value !== "string" || !value) return;
+
+    // Normaliza URL
+    let url =
+      value.startsWith("http") || value.startsWith("/")
+        ? value
+        : `/${value}`;
+
+    // Si es Cloudinary, fuerza descarga cuando es posible (raw/pdf y muchos casos)
+    if (url.includes("res.cloudinary.com") && url.includes("/upload/")) {
+      url = url.replace("/upload/", "/upload/fl_attachment/");
+    }
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.target = "_blank";
+    a.rel = "noreferrer";
+
+    const fallbackName = url.split("/").pop() || `${field}`;
+    a.download = fallbackName;
+
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  };
+
+  const saveSocial = async () => {
+    setSavingSocial(true);
+    try {
+      await fetch(`/api/users/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          linkedin_url: social.linkedin_url || null,
+          facebook_url: social.facebook_url || null,
+          instagram_url: social.instagram_url || null,
+          tiktok_url: social.tiktok_url || null,
+          x_url: social.x_url || null,
+        }),
       });
 
       await loadUser();
-      setUploading(null);
-    };
+    } finally {
+      setSavingSocial(false);
+    }
+  };
 
-    const uploadReqFile = async (file: File, field: ReqKey) => {
-      setUploading(field);
+  // ---------------------------
+  // ✅ UI components internos
+  // ---------------------------
+  const FieldRow = ({
+    label,
+    value,
+  }: {
+    label: string;
+    value: React.ReactNode;
+  }) => (
+    <div className="flex items-start justify-between gap-4 py-2 border-b border-white/10 last:border-b-0">
+      <p className="text-sm text-white/60">{label}</p>
+      <div className="text-sm text-white text-right break-all">{value}</div>
+    </div>
+  );
 
-      const fd = new FormData();
-      fd.append("file", file);
-      fd.append("field", field);
-      fd.append("userId", String(id));
+  const SocialInput = ({
+    label,
+    keyName,
+  }: {
+    label: string;
+    keyName: keyof typeof social;
+  }) => {
+    const current = (user as any)?.[keyName] as string | null | undefined;
 
-      const res = await fetch("/api/requisitos/upload-file", {
-        method: "POST",
-        credentials: "include",
-        body: fd,
-      });
-
-      const data = await res.json().catch(() => null);
-
-      if (res.ok && data?.ok && typeof data.url === "string") {
-        setRequisitos((prev) => (prev ? { ...prev, [field]: data.url } : prev));
-        setNoAplica((prev) => ({ ...prev, [field]: false }));
-      }
-
-      setUploading(null);
-    };
-
-    const toggleNoAplica = async (field: ReqKey) => {
-      const newValue = !noAplica[field];
-
-      setNoAplica((prev) => ({ ...prev, [field]: newValue }));
-      setRequisitos((prev) => (prev ? { ...prev, [field]: null } : prev));
-
-      await fetch("/api/requisitos/set-false", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ userId: id, field }),
-      });
-    };
-
-    const downloadFile = (value: unknown, field: ReqKey) => {
-      if (typeof value !== "string" || !value) return;
-
-      // Normaliza URL
-      const url =
-        value.startsWith("http") || value.startsWith("/") ? value : `/${value}`;
-
-      // ✅ Si es Cloudinary: descarga por tu API (para nombre correcto)
-      if (url.includes("res.cloudinary.com")) {
-        // Intenta sacar extensión del URL
-        const last = url.split("/").pop() || "";
-        const extMatch = last.match(/\.(pdf|png|jpg|jpeg|webp)$/i);
-        const ext = extMatch ? extMatch[0].toLowerCase() : "";
-
-        const filename = `${field}${ext || ".pdf"}`; // si no hay ext, asume pdf (ajústalo si quieres)
-
-        const apiUrl = `/api/download?url=${encodeURIComponent(url)}&name=${encodeURIComponent(filename)}`;
-
-        const a = document.createElement("a");
-        a.href = apiUrl;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        return;
-      }
-
-      // ✅ Si es ruta interna (tu app), abre directo
-      const a = document.createElement("a");
-      a.href = url;
-      a.target = "_blank";
-      a.rel = "noreferrer";
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-    };
-
-
-    const saveSocial = async () => {
-      setSavingSocial(true);
-      try {
-        await fetch(`/api/users/${id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({
-            linkedin_url: social.linkedin_url || null,
-            facebook_url: social.facebook_url || null,
-            instagram_url: social.instagram_url || null,
-            tiktok_url: social.tiktok_url || null,
-            x_url: social.x_url || null,
-          }),
-        });
-
-        await loadUser();
-      } finally {
-        setSavingSocial(false);
-      }
-    };
-
-    // ---------------------------
-    // ✅ UI components internos
-    // ---------------------------
-    const FieldRow = ({
-      label,
-      value,
-    }: {
-      label: string;
-      value: React.ReactNode;
-    }) => (
-      <div className="flex items-start justify-between gap-4 py-2 border-b border-white/10 last:border-b-0">
-        <p className="text-sm text-white/60">{label}</p>
-        <div className="text-sm text-white text-right break-all">{value}</div>
+    return (
+      <div className="space-y-2">
+        <label className="text-xs text-white/60">{label}</label>
+        <input
+          value={social[keyName]}
+          onChange={(e) =>
+            setSocial((s) => ({ ...s, [keyName]: e.target.value }))
+          }
+          className="w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm text-white placeholder:text-white/40 outline-none focus:ring-2 focus:ring-white/20"
+          placeholder={`Pega el link de ${label}`}
+        />
+        {current && (
+          <a
+            href={current}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex text-sm text-emerald-300 hover:text-emerald-200 underline"
+          >
+            Abrir {label}
+          </a>
+        )}
       </div>
     );
+  };
 
-    const SocialInput = ({
-      label,
-      keyName,
-    }: {
-      label: string;
-      keyName: keyof typeof social;
-    }) => {
-      const current = (user as any)?.[keyName] as string | null | undefined;
+  const ReqItem = ({
+    label,
+    field,
+    value,
+  }: {
+    label: string;
+    field: ReqKey;
+    value: UrlOrNull;
+  }) => {
+    const optional = OPTIONAL_REQS.includes(field);
+    const disabled = !!noAplica[field];
+    const uploaded = !!value;
 
-      return (
-        <div className="space-y-2">
-          <label className="text-xs text-white/60">{label}</label>
-          <input
-            value={social[keyName]}
-            onChange={(e) => setSocial((s) => ({ ...s, [keyName]: e.target.value }))}
-            className="w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm text-white placeholder:text-white/40 outline-none focus:ring-2 focus:ring-white/20"
-            placeholder={`Pega el link de ${label}`}
-          />
-          {current && (
-            <a
-              href={current}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex text-sm text-emerald-300 hover:text-emerald-200 underline"
-            >
-              Abrir {label}
-            </a>
+    return (
+      <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 space-y-3">
+        <div className="flex items-center justify-between gap-4">
+          <p className="text-sm font-semibold text-white">{label}</p>
+
+          {optional && (
+            <label className="flex items-center gap-2 text-xs text-white/70">
+              No aplica
+              <input
+                type="checkbox"
+                checked={!!noAplica[field]}
+                onChange={() => toggleNoAplica(field)}
+                className="accent-blue-500"
+              />
+            </label>
           )}
         </div>
-      );
-    };
 
-    const ReqItem = ({
-      label,
-      field,
-      value,
-    }: {
-      label: string;
-      field: ReqKey;
-      value: UrlOrNull;
-    }) => {
-      const optional = OPTIONAL_REQS.includes(field);
-      const disabled = !!noAplica[field];
-      const uploaded = !!value;
+        {disabled ? (
+          <p className="text-yellow-300 text-xs">Marcado como NO APLICA</p>
+        ) : (
+          <>
+            <p
+              className={
+                uploaded ? "text-emerald-300 text-xs" : "text-red-300 text-xs"
+              }
+            >
+              {uploaded ? "✔ Documento cargado" : "✘ Pendiente"}
+            </p>
 
-      return (
-        <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 space-y-3">
-          <div className="flex items-center justify-between gap-4">
-            <p className="text-sm font-semibold text-white">{label}</p>
+            <div className="flex flex-wrap items-center gap-2">
+              {uploaded && (
+                <button
+                  type="button"
+                  onClick={() => downloadFile(value, field)}
+                  className="px-3 py-1.5 rounded-lg bg-emerald-600/90 hover:bg-emerald-600 text-white text-xs border border-white/10"
+                >
+                  Descargar
+                </button>
+              )}
 
-            {optional && (
-              <label className="flex items-center gap-2 text-xs text-white/70">
-                No aplica
+              <label className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-white text-xs border border-white/10 cursor-pointer">
+                Subir archivo
                 <input
-                  type="checkbox"
-                  checked={!!noAplica[field]}
-                  onChange={() => toggleNoAplica(field)}
-                  className="accent-blue-500"
+                  type="file"
+                  onChange={(e) =>
+                    e.target.files && uploadReqFile(e.target.files[0], field)
+                  }
+                  className="hidden"
                 />
               </label>
-            )}
-          </div>
 
-          {disabled ? (
-            <p className="text-yellow-300 text-xs">Marcado como NO APLICA</p>
-          ) : (
-            <>
-              <p className={uploaded ? "text-emerald-300 text-xs" : "text-red-300 text-xs"}>
-                {uploaded ? "✔ Documento cargado" : "✘ Pendiente"}
-              </p>
+              {uploading === field && (
+                <span className="text-xs text-blue-300">Subiendo...</span>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    );
+  };
 
-              <div className="flex flex-wrap items-center gap-2">
-                {uploaded && (
-                  <button
-                    type="button"
-                    onClick={() => downloadFile(value, field)}
-                    className="px-3 py-1.5 rounded-lg bg-emerald-600/90 hover:bg-emerald-600 text-white text-xs border border-white/10"
-                  >
-                    Descargar
-                  </button>
-                )}
+  const ImageBlock = ({
+    label,
+    src,
+    field,
+  }: {
+    label: string;
+    src?: string;
+    field: string;
+  }) => {
+    const isUploading = uploading === field;
 
-                <label className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-white text-xs border border-white/10 cursor-pointer">
-                  Subir archivo
-                  <input
-                    type="file"
-                    onChange={(e) =>
-                      e.target.files && uploadReqFile(e.target.files[0], field)
-                    }
-                    className="hidden"
-                  />
-                </label>
-
-                {uploading === field && (
-                  <span className="text-xs text-blue-300">Subiendo...</span>
-                )}
-              </div>
-            </>
+    return (
+      <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-semibold text-white">{label}</p>
+          {isUploading && (
+            <span className="text-xs text-blue-300">Subiendo...</span>
           )}
         </div>
-      );
-    };
 
-    const ImageBlock = ({
-      label,
-      src,
-      field,
-    }: {
-      label: string;
-      src?: string;
-      field: string;
-    }) => {
-      const isUploading = uploading === field;
-
-      return (
-        <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-semibold text-white">{label}</p>
-            {isUploading && <span className="text-xs text-blue-300">Subiendo...</span>}
-          </div>
-
-          <div className="relative overflow-hidden rounded-lg border border-white/10 bg-black/20">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={src || "/placeholder.png"}
-              className="w-full h-48 object-cover"
-              alt={label}
-            />
-          </div>
-
-          <label className="inline-flex items-center justify-center w-full px-3 py-2 rounded-lg bg-white/10 hover:bg-white/15 text-white text-xs border border-white/10 cursor-pointer">
-            {isUploading ? "Subiendo..." : "Cambiar imagen"}
-            <input
-              type="file"
-              accept="image/*"
-              onChange={(e) => e.target.files && uploadImage(e.target.files[0], field)}
-              className="hidden"
-            />
-          </label>
+        <div className="relative overflow-hidden rounded-lg border border-white/10 bg-black/20">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={src || "/placeholder.png"}
+            className="w-full h-48 object-cover"
+            alt={label}
+          />
         </div>
-      );
-    };
 
-    const expedienteBadge = useMemo(() => {
-      if (!user) return null;
-      const ok = user.estado_expediente === "COMPLETO";
-      return (
-        <span
-          className={[
-            "inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold border",
-            ok
-              ? "bg-emerald-500/10 text-emerald-200 border-emerald-500/20"
-              : "bg-yellow-500/10 text-yellow-200 border-yellow-500/20",
-          ].join(" ")}
-        >
-          {ok ? "✔ Expediente completo" : "⚠ Expediente incompleto"}
-        </span>
-      );
-    }, [user]);
+        <label className="inline-flex items-center justify-center w-full px-3 py-2 rounded-lg bg-white/10 hover:bg-white/15 text-white text-xs border border-white/10 cursor-pointer">
+          {isUploading ? "Subiendo..." : "Cambiar imagen"}
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) =>
+              e.target.files && uploadImage(e.target.files[0], field)
+            }
+            className="hidden"
+          />
+        </label>
+      </div>
+    );
+  };
 
-    // ---------------------------
-    // ✅ Guards
-    // ---------------------------
-    if (authStatus === "loading") {
-      return (
-        <div className="min-h-screen flex items-center justify-center text-white">
-          Validando acceso...
-        </div>
-      );
-    }
-
-    if (authStatus === "unauthorized") return null;
-
-    if (loading) return <p className="p-8 text-white/60">Cargando...</p>;
-    if (!user || !requisitos) return <p className="p-8 text-red-300">Error</p>;
-
-    // ---------------------------
-    // ✅ Render
-    // ---------------------------
+  const expedienteBadge = useMemo(() => {
+    if (!user) return null;
+    const ok = user.estado_expediente === "COMPLETO";
     return (
-      <div className="min-h-screen bg-[radial-gradient(900px_circle_at_20%_10%,rgba(59,130,246,0.22),transparent_60%),radial-gradient(900px_circle_at_80%_20%,rgba(245,158,11,0.18),transparent_55%),linear-gradient(135deg,#070b1a_0%,#081a3a_45%,#3a2a07_100%)]">
-        <div className="p-6 md:p-10 max-w-7xl mx-auto space-y-6">  
-      {/* Header */}
+      <span
+        className={[
+          "inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold border",
+          ok
+            ? "bg-emerald-500/10 text-emerald-200 border-emerald-500/20"
+            : "bg-yellow-500/10 text-yellow-200 border-yellow-500/20",
+        ].join(" ")}
+      >
+        {ok ? "✔ Expediente completo" : "⚠ Expediente incompleto"}
+      </span>
+    );
+  }, [user]);
+
+  // ---------------------------
+  // ✅ Guards
+  // ---------------------------
+  if (authStatus === "loading") {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-white">
+        Validando acceso...
+      </div>
+    );
+  }
+
+  if (authStatus === "unauthorized") return null;
+
+  if (loading) return <p className="p-8 text-white/60">Cargando...</p>;
+  if (!user || !requisitos) return <p className="p-8 text-red-300">Error</p>;
+
+  // ---------------------------
+  // ✅ Render
+  // ---------------------------
+  return (
+    <div className="min-h-screen bg-[radial-gradient(900px_circle_at_20%_10%,rgba(59,130,246,0.22),transparent_60%),radial-gradient(900px_circle_at_80%_20%,rgba(245,158,11,0.18),transparent_55%),linear-gradient(135deg,#070b1a_0%,#081a3a_45%,#3a2a07_100%)]">
+      <div className="p-6 md:p-10 max-w-7xl mx-auto space-y-6">
+        {/* Header */}
         <div className="rounded-2xl p-6 border border-white/10 bg-white/5 shadow-xl backdrop-blur-md">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div className="space-y-1">
@@ -497,7 +498,9 @@
           <div className="lg:col-span-4 space-y-6">
             {/* Info */}
             <div className="rounded-2xl p-6 border border-white/10 bg-white/5 shadow-xl backdrop-blur-md">
-              <h2 className="text-white font-semibold text-base mb-3">Información</h2>
+              <h2 className="text-white font-semibold text-base mb-3">
+                Información
+              </h2>
 
               <div className="space-y-0">
                 <FieldRow label="Nombre" value={user.nombre} />
@@ -511,7 +514,9 @@
             {/* Redes */}
             <div className="rounded-2xl p-6 border border-white/10 bg-white/5 shadow-xl backdrop-blur-md">
               <div className="flex items-center justify-between gap-3 mb-4">
-                <h2 className="text-white font-semibold text-base">Redes sociales</h2>
+                <h2 className="text-white font-semibold text-base">
+                  Redes sociales
+                </h2>
                 <button
                   type="button"
                   onClick={saveSocial}
@@ -535,7 +540,9 @@
           {/* Middle: imágenes */}
           <div className="lg:col-span-4 space-y-6">
             <div className="rounded-2xl p-6 border border-white/10 bg-white/5 shadow-xl backdrop-blur-md">
-              <h2 className="text-white font-semibold text-base mb-4">Imágenes</h2>
+              <h2 className="text-white font-semibold text-base mb-4">
+                Imágenes
+              </h2>
 
               <div className="space-y-4">
                 <ImageBlock
@@ -560,17 +567,72 @@
           {/* Right: requisitos */}
           <div className="lg:col-span-4 space-y-6">
             <div className="rounded-2xl p-6 border border-white/10 bg-white/5 shadow-xl backdrop-blur-md">
-              <h2 className="text-white font-semibold text-base mb-4">Requisitos</h2>
+              <h2 className="text-white font-semibold text-base mb-4">
+                Requisitos
+              </h2>
 
-              <div className="space-y-3">
-                {/* ✅ Mantengo exactamente tus campos (no elimino funcionalidad) */}
-                <ReqItem label="Hoja de vida" field="hoja_vida" value={requisitos.hoja_vida} />
-                <ReqItem label="Copia cédula" field="copia_cedula" value={requisitos.copia_cedula} />
-                <ReqItem label="Certificado votación" field="certificado_votacion" value={requisitos.certificado_votacion} />
-                <ReqItem label="Foto carnet" field="foto_carnet" value={requisitos.foto_carnet} />
-                <ReqItem label="Título estudios" field="titulo_estudios" value={requisitos.titulo_estudios} />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {/* Obligatorios */}
+                <ReqItem
+                  label="Hoja de vida"
+                  field="hoja_vida"
+                  value={requisitos.hoja_vida}
+                />
+                <ReqItem
+                  label="Copia cédula"
+                  field="copia_cedula"
+                  value={requisitos.copia_cedula}
+                />
+                <ReqItem
+                  label="Certificado votación"
+                  field="certificado_votacion"
+                  value={requisitos.certificado_votacion}
+                />
+                <ReqItem
+                  label="Foto carnet"
+                  field="foto_carnet"
+                  value={requisitos.foto_carnet}
+                />
+                <ReqItem
+                  label="Título estudios"
+                  field="titulo_estudios"
+                  value={requisitos.titulo_estudios}
+                />
 
-                {/* ✅ Los que ya tenías abajo (opcionales) */}
+                {/* ✅ Faltantes */}
+                <ReqItem
+                  label="Certificados cursos"
+                  field="certificados_cursos"
+                  value={requisitos.certificados_cursos}
+                />
+                <ReqItem
+                  label="Certificados laborales"
+                  field="certificados_laborales"
+                  value={requisitos.certificados_laborales}
+                />
+                <ReqItem
+                  label="Certificados honorabilidad"
+                  field="certificados_honorabilidad"
+                  value={requisitos.certificados_honorabilidad}
+                />
+                <ReqItem
+                  label="Historial IESS"
+                  field="historial_iess"
+                  value={requisitos.historial_iess}
+                />
+                <ReqItem
+                  label="Antecedentes penales"
+                  field="antecedentes_penales"
+                  value={requisitos.antecedentes_penales}
+                />
+                <ReqItem
+                  label="Certificado bancario"
+                  field="certificado_bancario"
+                  value={requisitos.certificado_bancario}
+                />
+                <ReqItem label="RUC" field="ruc" value={requisitos.ruc} />
+
+                {/* Opcionales */}
                 <ReqItem
                   label="Discapacidad"
                   field="certificado_discapacidad"
@@ -601,7 +663,7 @@
             </div>
           </div>
         </div>
-        </div>
       </div>
-    );
-  }
+    </div>
+  );
+}

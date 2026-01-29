@@ -11,6 +11,7 @@ interface Requisitos {
   certificado_votacion: UrlOrNull;
   foto_carnet: UrlOrNull;
   titulo_estudios: UrlOrNull;
+
   certificados_cursos: UrlOrNull;
   certificados_laborales: UrlOrNull;
   certificados_honorabilidad: UrlOrNull;
@@ -18,6 +19,7 @@ interface Requisitos {
   antecedentes_penales: UrlOrNull;
   certificado_bancario: UrlOrNull;
   ruc: UrlOrNull;
+
   certificado_discapacidad: UrlOrNull;
   partida_matrimonio: UrlOrNull;
   partida_nacimiento_hijos: UrlOrNull;
@@ -62,8 +64,6 @@ export default function UsuarioDetallePage() {
   const [user, setUser] = useState<UserDetail | null>(null);
   const [requisitos, setRequisitos] = useState<Requisitos | null>(null);
   const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
-
   const [uploading, setUploading] = useState<string | null>(null);
   const [noAplica, setNoAplica] = useState<Record<string, boolean>>({});
 
@@ -78,29 +78,21 @@ export default function UsuarioDetallePage() {
   const [savingSocial, setSavingSocial] = useState(false);
 
   // ---------------------------
-  // ✅ Verificación de acceso (roles normalizados)
+  // ✅ Verificación de acceso
   // ---------------------------
   useEffect(() => {
     const verifyUser = async () => {
       try {
         const res = await fetch("/api/auth/verify", {
-          method: "GET",
           cache: "no-store",
           credentials: "include",
         });
+        const data = await res.json();
 
-        const data = await res.json().catch(() => null);
-
-        if (!res.ok || !data?.ok || !data?.user?.rol) {
-          setAuthStatus("unauthorized");
-          return;
-        }
-
-        const rol = String(data.user.rol).trim().toLowerCase();
-        const allowed =
-          rol === "RRhh" || rol === "rrhh" || rol === "RRHH";
-
-        if (allowed) {
+        if (
+          data.ok &&
+          (data.user.rol === "admin" || data.user.rol === "Administrador")
+        ) {
           setUserRol(data.user.rol);
           setAuthStatus("authorized");
         } else {
@@ -123,42 +115,32 @@ export default function UsuarioDetallePage() {
   // ✅ Cargar usuario (solo si autorizado)
   // ---------------------------
   const loadUser = async () => {
-    setLoadError(null);
-    setLoading(true);
-
     try {
       const res = await fetch(`/api/users/${id}`, {
-        method: "GET",
         cache: "no-store",
         credentials: "include",
       });
+      const data = await res.json();
 
-      const data = await res.json().catch(() => null);
+      if (res.ok && data.ok) {
+        setUser(data.user);
+        setRequisitos(data.requisitos);
 
-      if (!res.ok || !data?.ok) {
-        setLoadError(data?.error || "No se pudo cargar el usuario");
-        setUser(null);
-        setRequisitos(null);
-        return;
+        // Inferir "no aplica" (solo opcionales)
+        const inferred: Record<string, boolean> = {};
+        OPTIONAL_REQS.forEach((k) => {
+          inferred[k] = data.requisitos?.[k] === null ? true : false;
+        });
+        setNoAplica((prev) => ({ ...inferred, ...prev }));
+
+        setSocial({
+          linkedin_url: data.user?.linkedin_url || "",
+          facebook_url: data.user?.facebook_url || "",
+          instagram_url: data.user?.instagram_url || "",
+          tiktok_url: data.user?.tiktok_url || "",
+          x_url: data.user?.x_url || "",
+        });
       }
-
-      setUser(data.user ?? null);
-      setRequisitos(data.requisitos ?? null);
-
-      // Inferir "no aplica" (solo opcionales)
-      const inferred: Record<string, boolean> = {};
-      OPTIONAL_REQS.forEach((k) => {
-        inferred[k] = data.requisitos?.[k] === null ? true : false;
-      });
-      setNoAplica((prev) => ({ ...inferred, ...prev }));
-
-      setSocial({
-        linkedin_url: data.user?.linkedin_url || "",
-        facebook_url: data.user?.facebook_url || "",
-        instagram_url: data.user?.instagram_url || "",
-        tiktok_url: data.user?.tiktok_url || "",
-        x_url: data.user?.x_url || "",
-      });
     } finally {
       setLoading(false);
     }
@@ -228,31 +210,31 @@ export default function UsuarioDetallePage() {
     });
   };
 
-  const downloadFile = async (value: unknown, field: ReqKey) => {
+  const downloadFile = (value: unknown, field: ReqKey) => {
     if (typeof value !== "string" || !value) return;
 
-    const url =
-      value.startsWith("http") || value.startsWith("/") ? value : `/${value}`;
+    // Normaliza URL
+    let url =
+      value.startsWith("http") || value.startsWith("/")
+        ? value
+        : `/${value}`;
 
-    const res = await fetch(url, { credentials: "include" });
-    if (!res.ok) return;
-
-    const blob = await res.blob();
-
-    const cd = res.headers.get("content-disposition") || "";
-    const match = cd.match(/filename\*?=(?:UTF-8'')?["']?([^"';]+)["']?/i);
-    const headerName = match?.[1] ? decodeURIComponent(match[1]) : null;
-
-    const fallbackName = url.split("/").pop() || `${field}`;
-    const filename = headerName || fallbackName;
+    // Si es Cloudinary, fuerza descarga cuando es posible (raw/pdf y muchos casos)
+    if (url.includes("res.cloudinary.com") && url.includes("/upload/")) {
+      url = url.replace("/upload/", "/upload/fl_attachment/");
+    }
 
     const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = filename;
+    a.href = url;
+    a.target = "_blank";
+    a.rel = "noreferrer";
+
+    const fallbackName = url.split("/").pop() || `${field}`;
+    a.download = fallbackName;
+
     document.body.appendChild(a);
     a.click();
     a.remove();
-    URL.revokeObjectURL(a.href);
   };
 
   const saveSocial = async () => {
@@ -477,9 +459,6 @@ export default function UsuarioDetallePage() {
   if (authStatus === "unauthorized") return null;
 
   if (loading) return <p className="p-8 text-white/60">Cargando...</p>;
-
-  if (loadError) return <p className="p-8 text-red-300">{loadError}</p>;
-
   if (!user || !requisitos) return <p className="p-8 text-red-300">Error</p>;
 
   // ---------------------------
@@ -515,8 +494,9 @@ export default function UsuarioDetallePage() {
 
         {/* Main grid */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Left */}
+          {/* Left: info + redes */}
           <div className="lg:col-span-4 space-y-6">
+            {/* Info */}
             <div className="rounded-2xl p-6 border border-white/10 bg-white/5 shadow-xl backdrop-blur-md">
               <h2 className="text-white font-semibold text-base mb-3">
                 Información
@@ -531,6 +511,7 @@ export default function UsuarioDetallePage() {
               </div>
             </div>
 
+            {/* Redes */}
             <div className="rounded-2xl p-6 border border-white/10 bg-white/5 shadow-xl backdrop-blur-md">
               <div className="flex items-center justify-between gap-3 mb-4">
                 <h2 className="text-white font-semibold text-base">
@@ -556,7 +537,7 @@ export default function UsuarioDetallePage() {
             </div>
           </div>
 
-          {/* Middle */}
+          {/* Middle: imágenes */}
           <div className="lg:col-span-4 space-y-6">
             <div className="rounded-2xl p-6 border border-white/10 bg-white/5 shadow-xl backdrop-blur-md">
               <h2 className="text-white font-semibold text-base mb-4">
@@ -564,14 +545,26 @@ export default function UsuarioDetallePage() {
               </h2>
 
               <div className="space-y-4">
-                <ImageBlock label="Foto del asesor" src={user.foto_asesor} field="foto_asesor" />
-                <ImageBlock label="Cédula frontal" src={user.cedula_frontal} field="cedula_frontal" />
-                <ImageBlock label="Cédula reverso" src={user.cedula_reverso} field="cedula_reverso" />
+                <ImageBlock
+                  label="Foto del asesor"
+                  src={user.foto_asesor}
+                  field="foto_asesor"
+                />
+                <ImageBlock
+                  label="Cédula frontal"
+                  src={user.cedula_frontal}
+                  field="cedula_frontal"
+                />
+                <ImageBlock
+                  label="Cédula reverso"
+                  src={user.cedula_reverso}
+                  field="cedula_reverso"
+                />
               </div>
             </div>
           </div>
 
-          {/* Right */}
+          {/* Right: requisitos */}
           <div className="lg:col-span-4 space-y-6">
             <div className="rounded-2xl p-6 border border-white/10 bg-white/5 shadow-xl backdrop-blur-md">
               <h2 className="text-white font-semibold text-base mb-4">
@@ -579,18 +572,86 @@ export default function UsuarioDetallePage() {
               </h2>
 
               <div className="space-y-3">
-                <ReqItem label="Hoja de vida" field="hoja_vida" value={requisitos.hoja_vida} />
-                <ReqItem label="Copia cédula" field="copia_cedula" value={requisitos.copia_cedula} />
-                <ReqItem label="Certificado votación" field="certificado_votacion" value={requisitos.certificado_votacion} />
-                <ReqItem label="Foto carnet" field="foto_carnet" value={requisitos.foto_carnet} />
-                <ReqItem label="Título estudios" field="titulo_estudios" value={requisitos.titulo_estudios} />
+                {/* Obligatorios */}
+                <ReqItem
+                  label="Hoja de vida"
+                  field="hoja_vida"
+                  value={requisitos.hoja_vida}
+                />
+                <ReqItem
+                  label="Copia cédula"
+                  field="copia_cedula"
+                  value={requisitos.copia_cedula}
+                />
+                <ReqItem
+                  label="Certificado votación"
+                  field="certificado_votacion"
+                  value={requisitos.certificado_votacion}
+                />
+                <ReqItem
+                  label="Foto carnet"
+                  field="foto_carnet"
+                  value={requisitos.foto_carnet}
+                />
+                <ReqItem
+                  label="Título estudios"
+                  field="titulo_estudios"
+                  value={requisitos.titulo_estudios}
+                />
 
-                <ReqItem label="Discapacidad" field="certificado_discapacidad" value={requisitos.certificado_discapacidad} />
-                <ReqItem label="Acta matrimonio" field="partida_matrimonio" value={requisitos.partida_matrimonio} />
-                <ReqItem label="Nacimiento hijos" field="partida_nacimiento_hijos" value={requisitos.partida_nacimiento_hijos} />
+                {/* ✅ Faltantes */}
+                <ReqItem
+                  label="Certificados cursos"
+                  field="certificados_cursos"
+                  value={requisitos.certificados_cursos}
+                />
+                <ReqItem
+                  label="Certificados laborales"
+                  field="certificados_laborales"
+                  value={requisitos.certificados_laborales}
+                />
+                <ReqItem
+                  label="Certificados honorabilidad"
+                  field="certificados_honorabilidad"
+                  value={requisitos.certificados_honorabilidad}
+                />
+                <ReqItem
+                  label="Historial IESS"
+                  field="historial_iess"
+                  value={requisitos.historial_iess}
+                />
+                <ReqItem
+                  label="Antecedentes penales"
+                  field="antecedentes_penales"
+                  value={requisitos.antecedentes_penales}
+                />
+                <ReqItem
+                  label="Certificado bancario"
+                  field="certificado_bancario"
+                  value={requisitos.certificado_bancario}
+                />
+                <ReqItem label="RUC" field="ruc" value={requisitos.ruc} />
+
+                {/* Opcionales */}
+                <ReqItem
+                  label="Discapacidad"
+                  field="certificado_discapacidad"
+                  value={requisitos.certificado_discapacidad}
+                />
+                <ReqItem
+                  label="Acta matrimonio"
+                  field="partida_matrimonio"
+                  value={requisitos.partida_matrimonio}
+                />
+                <ReqItem
+                  label="Nacimiento hijos"
+                  field="partida_nacimiento_hijos"
+                  value={requisitos.partida_nacimiento_hijos}
+                />
               </div>
             </div>
 
+            {/* CTA volver (por si el header no está visible en scroll) */}
             <div className="rounded-2xl p-4 border border-white/10 bg-white/5 shadow-xl backdrop-blur-md">
               <button
                 onClick={() => router.back()}
