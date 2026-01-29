@@ -11,7 +11,6 @@ interface Requisitos {
   certificado_votacion: UrlOrNull;
   foto_carnet: UrlOrNull;
   titulo_estudios: UrlOrNull;
-
   certificados_cursos: UrlOrNull;
   certificados_laborales: UrlOrNull;
   certificados_honorabilidad: UrlOrNull;
@@ -19,7 +18,6 @@ interface Requisitos {
   antecedentes_penales: UrlOrNull;
   certificado_bancario: UrlOrNull;
   ruc: UrlOrNull;
-
   certificado_discapacidad: UrlOrNull;
   partida_matrimonio: UrlOrNull;
   partida_nacimiento_hijos: UrlOrNull;
@@ -55,7 +53,6 @@ export default function UsuarioDetallePage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
 
-  // ✅ Auth
   const [authStatus, setAuthStatus] = useState<
     "loading" | "authorized" | "unauthorized"
   >("loading");
@@ -67,7 +64,6 @@ export default function UsuarioDetallePage() {
   const [uploading, setUploading] = useState<string | null>(null);
   const [noAplica, setNoAplica] = useState<Record<string, boolean>>({});
 
-  // ✅ redes (form)
   const [social, setSocial] = useState({
     linkedin_url: "",
     facebook_url: "",
@@ -91,7 +87,9 @@ export default function UsuarioDetallePage() {
 
         if (
           data.ok &&
-          (data.user.rol === "admin" || data.user.rol === "spa" || data.user.rol === "rrhh")
+          (data.user.rol === "admin" ||
+            data.user.rol === "spa" ||
+            data.user.rol === "rrhh")
         ) {
           setUserRol(data.user.rol);
           setAuthStatus("authorized");
@@ -126,7 +124,6 @@ export default function UsuarioDetallePage() {
         setUser(data.user);
         setRequisitos(data.requisitos);
 
-        // Inferir "no aplica" (solo opcionales)
         const inferred: Record<string, boolean> = {};
         OPTIONAL_REQS.forEach((k) => {
           inferred[k] = data.requisitos?.[k] === null ? true : false;
@@ -210,28 +207,38 @@ export default function UsuarioDetallePage() {
     });
   };
 
+  // ✅ Download por API para Cloudinary
   const downloadFile = (value: unknown, field: ReqKey) => {
     if (typeof value !== "string" || !value) return;
 
-    // Normaliza URL
-    let url =
+    const url =
       value.startsWith("http") || value.startsWith("/")
         ? value
         : `/${value}`;
 
-    // Si es Cloudinary, fuerza descarga cuando es posible (raw/pdf y muchos casos)
-    if (url.includes("res.cloudinary.com") && url.includes("/upload/")) {
-      url = url.replace("/upload/", "/upload/fl_attachment/");
+    if (url.includes("res.cloudinary.com")) {
+      const last = url.split("/").pop() || "";
+      const extMatch = last.match(/\.(pdf|png|jpg|jpeg|webp)$/i);
+      const ext = extMatch ? extMatch[0].toLowerCase() : ".pdf";
+      const filename = `${field}${ext}`;
+
+      const apiUrl = `/api/download?url=${encodeURIComponent(
+        url
+      )}&name=${encodeURIComponent(filename)}`;
+
+      const a = document.createElement("a");
+      a.href = apiUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      return;
     }
 
     const a = document.createElement("a");
     a.href = url;
     a.target = "_blank";
     a.rel = "noreferrer";
-
-    const fallbackName = url.split("/").pop() || `${field}`;
-    a.download = fallbackName;
-
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -418,9 +425,7 @@ export default function UsuarioDetallePage() {
           <input
             type="file"
             accept="image/*"
-            onChange={(e) =>
-              e.target.files && uploadImage(e.target.files[0], field)
-            }
+            onChange={(e) => e.target.files && uploadImage(e.target.files[0], field)}
             className="hidden"
           />
         </label>
@@ -465,201 +470,148 @@ export default function UsuarioDetallePage() {
   // ✅ Render
   // ---------------------------
   return (
-    <div className="min-h-screen bg-[radial-gradient(900px_circle_at_20%_10%,rgba(59,130,246,0.22),transparent_60%),radial-gradient(900px_circle_at_80%_20%,rgba(245,158,11,0.18),transparent_55%),linear-gradient(135deg,#070b1a_0%,#081a3a_45%,#3a2a07_100%)]">
-      <div className="p-6 md:p-10 max-w-7xl mx-auto space-y-6">
-        {/* Header */}
-        <div className="rounded-2xl p-6 border border-white/10 bg-white/5 shadow-xl backdrop-blur-md">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div className="space-y-1">
-              <h1 className="text-2xl md:text-3xl font-bold text-white">
-                Detalle del Asesor
-              </h1>
-              <p className="text-white/70 text-sm">
-                {user.nombre} · {user.correo}
-              </p>
-            </div>
-
-            <div className="flex items-center gap-3 flex-wrap">
-              {expedienteBadge}
-              <button
-                onClick={() => router.back()}
-                className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/15 text-white text-sm border border-white/10"
-                type="button"
-              >
-                Volver
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Main grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Left: info + redes */}
-          <div className="lg:col-span-4 space-y-6">
-            {/* Info */}
-            <div className="rounded-2xl p-6 border border-white/10 bg-white/5 shadow-xl backdrop-blur-md">
-              <h2 className="text-white font-semibold text-base mb-3">
-                Información
-              </h2>
-
-              <div className="space-y-0">
-                <FieldRow label="Nombre" value={user.nombre} />
-                <FieldRow label="Correo" value={user.correo} />
-                <FieldRow label="Cédula" value={user.cedula} />
-                <FieldRow label="Rol del usuario" value={user.rol} />
-                <FieldRow label="Tu acceso" value={userRol ?? "-"} />
+    <div
+      className="min-h-screen bg-cover bg-center"
+      style={{ backgroundImage: "url('/fondo-bg.png')" }}
+    >
+      <div className="min-h-screen bg-black/70">
+        <div className="p-6 md:p-10 max-w-7xl mx-auto space-y-6">
+          {/* Header */}
+          <div className="rounded-2xl p-6 border border-white/10 bg-white/5 shadow-xl backdrop-blur-md">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div className="space-y-1">
+                <h1 className="text-2xl md:text-3xl font-bold text-white">
+                  Detalle del Asesor
+                </h1>
+                <p className="text-white/70 text-sm">
+                  {user.nombre} · {user.correo}
+                </p>
               </div>
-            </div>
 
-            {/* Redes */}
-            <div className="rounded-2xl p-6 border border-white/10 bg-white/5 shadow-xl backdrop-blur-md">
-              <div className="flex items-center justify-between gap-3 mb-4">
-                <h2 className="text-white font-semibold text-base">
-                  Redes sociales
-                </h2>
+              <div className="flex items-center gap-3 flex-wrap">
+                {expedienteBadge}
                 <button
+                  onClick={() => router.back()}
+                  className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/15 text-white text-sm border border-white/10"
                   type="button"
-                  onClick={saveSocial}
-                  disabled={savingSocial}
-                  className="px-4 py-2 rounded-lg bg-blue-600/90 hover:bg-blue-600 disabled:opacity-60 text-white text-sm border border-white/10"
                 >
-                  {savingSocial ? "Guardando..." : "Guardar"}
+                  Volver
                 </button>
               </div>
-
-              <div className="space-y-4">
-                <SocialInput label="LinkedIn" keyName="linkedin_url" />
-                <SocialInput label="Facebook" keyName="facebook_url" />
-                <SocialInput label="Instagram" keyName="instagram_url" />
-                <SocialInput label="TikTok" keyName="tiktok_url" />
-                <SocialInput label="X" keyName="x_url" />
-              </div>
             </div>
           </div>
 
-          {/* Middle: imágenes */}
-          <div className="lg:col-span-4 space-y-6">
-            <div className="rounded-2xl p-6 border border-white/10 bg-white/5 shadow-xl backdrop-blur-md">
-              <h2 className="text-white font-semibold text-base mb-4">
-                Imágenes
-              </h2>
+          {/* Main grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* Left: info + redes */}
+            <div className="lg:col-span-4 space-y-6">
+              {/* Info */}
+              <div className="rounded-2xl p-6 border border-white/10 bg-white/5 shadow-xl backdrop-blur-md">
+                <h2 className="text-white font-semibold text-base mb-3">
+                  Información
+                </h2>
 
-              <div className="space-y-4">
-                <ImageBlock
-                  label="Foto del asesor"
-                  src={user.foto_asesor}
-                  field="foto_asesor"
-                />
-                <ImageBlock
-                  label="Cédula frontal"
-                  src={user.cedula_frontal}
-                  field="cedula_frontal"
-                />
-                <ImageBlock
-                  label="Cédula reverso"
-                  src={user.cedula_reverso}
-                  field="cedula_reverso"
-                />
+                <div className="space-y-0">
+                  <FieldRow label="Nombre" value={user.nombre} />
+                  <FieldRow label="Correo" value={user.correo} />
+                  <FieldRow label="Cédula" value={user.cedula} />
+                  <FieldRow label="Rol del usuario" value={user.rol} />
+                  <FieldRow label="Tu acceso" value={userRol ?? "-"} />
+                </div>
               </div>
-            </div>
-          </div>
 
-          {/* Right: requisitos */}
-          <div className="lg:col-span-4 space-y-6">
-            <div className="rounded-2xl p-6 border border-white/10 bg-white/5 shadow-xl backdrop-blur-md">
-              <h2 className="text-white font-semibold text-base mb-4">
-                Requisitos
-              </h2>
+              {/* Redes */}
+              <div className="rounded-2xl p-6 border border-white/10 bg-white/5 shadow-xl backdrop-blur-md">
+                <div className="flex items-center justify-between gap-3 mb-4">
+                  <h2 className="text-white font-semibold text-base">
+                    Redes sociales
+                  </h2>
+                  <button
+                    type="button"
+                    onClick={saveSocial}
+                    disabled={savingSocial}
+                    className="px-4 py-2 rounded-lg bg-blue-600/90 hover:bg-blue-600 disabled:opacity-60 text-white text-sm border border-white/10"
+                  >
+                    {savingSocial ? "Guardando..." : "Guardar"}
+                  </button>
+                </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {/* Obligatorios */}
-                <ReqItem
-                  label="Hoja de vida"
-                  field="hoja_vida"
-                  value={requisitos.hoja_vida}
-                />
-                <ReqItem
-                  label="Copia cédula"
-                  field="copia_cedula"
-                  value={requisitos.copia_cedula}
-                />
-                <ReqItem
-                  label="Certificado votación"
-                  field="certificado_votacion"
-                  value={requisitos.certificado_votacion}
-                />
-                <ReqItem
-                  label="Foto carnet"
-                  field="foto_carnet"
-                  value={requisitos.foto_carnet}
-                />
-                <ReqItem
-                  label="Título estudios"
-                  field="titulo_estudios"
-                  value={requisitos.titulo_estudios}
-                />
-
-                {/* ✅ Faltantes */}
-                <ReqItem
-                  label="Certificados cursos"
-                  field="certificados_cursos"
-                  value={requisitos.certificados_cursos}
-                />
-                <ReqItem
-                  label="Certificados laborales"
-                  field="certificados_laborales"
-                  value={requisitos.certificados_laborales}
-                />
-                <ReqItem
-                  label="Certificados honorabilidad"
-                  field="certificados_honorabilidad"
-                  value={requisitos.certificados_honorabilidad}
-                />
-                <ReqItem
-                  label="Historial IESS"
-                  field="historial_iess"
-                  value={requisitos.historial_iess}
-                />
-                <ReqItem
-                  label="Antecedentes penales"
-                  field="antecedentes_penales"
-                  value={requisitos.antecedentes_penales}
-                />
-                <ReqItem
-                  label="Certificado bancario"
-                  field="certificado_bancario"
-                  value={requisitos.certificado_bancario}
-                />
-                <ReqItem label="RUC" field="ruc" value={requisitos.ruc} />
-
-                {/* Opcionales */}
-                <ReqItem
-                  label="Discapacidad"
-                  field="certificado_discapacidad"
-                  value={requisitos.certificado_discapacidad}
-                />
-                <ReqItem
-                  label="Acta matrimonio"
-                  field="partida_matrimonio"
-                  value={requisitos.partida_matrimonio}
-                />
-                <ReqItem
-                  label="Nacimiento hijos"
-                  field="partida_nacimiento_hijos"
-                  value={requisitos.partida_nacimiento_hijos}
-                />
+                <div className="space-y-4">
+                  <SocialInput label="LinkedIn" keyName="linkedin_url" />
+                  <SocialInput label="Facebook" keyName="facebook_url" />
+                  <SocialInput label="Instagram" keyName="instagram_url" />
+                  <SocialInput label="TikTok" keyName="tiktok_url" />
+                  <SocialInput label="X" keyName="x_url" />
+                </div>
               </div>
             </div>
 
-            {/* CTA volver (por si el header no está visible en scroll) */}
-            <div className="rounded-2xl p-4 border border-white/10 bg-white/5 shadow-xl backdrop-blur-md">
-              <button
-                onClick={() => router.back()}
-                className="w-full px-6 py-2 rounded-lg bg-white/10 hover:bg-white/15 text-white text-sm border border-white/10"
-                type="button"
-              >
-                Volver
-              </button>
+            {/* Middle: imágenes */}
+            <div className="lg:col-span-4 space-y-6">
+              <div className="rounded-2xl p-6 border border-white/10 bg-white/5 shadow-xl backdrop-blur-md">
+                <h2 className="text-white font-semibold text-base mb-4">
+                  Imágenes
+                </h2>
+
+                <div className="space-y-4">
+                  <ImageBlock
+                    label="Foto del asesor"
+                    src={user.foto_asesor}
+                    field="foto_asesor"
+                  />
+                  <ImageBlock
+                    label="Cédula frontal"
+                    src={user.cedula_frontal}
+                    field="cedula_frontal"
+                  />
+                  <ImageBlock
+                    label="Cédula reverso"
+                    src={user.cedula_reverso}
+                    field="cedula_reverso"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Right: requisitos */}
+            <div className="lg:col-span-4 space-y-6">
+              <div className="rounded-2xl p-6 border border-white/10 bg-white/5 shadow-xl backdrop-blur-md">
+                <h2 className="text-white font-semibold text-base mb-4">
+                  Requisitos
+                </h2>
+
+                {/* ✅ 2 columnas */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <ReqItem label="Hoja de vida" field="hoja_vida" value={requisitos.hoja_vida} />
+                  <ReqItem label="Copia cédula" field="copia_cedula" value={requisitos.copia_cedula} />
+                  <ReqItem label="Certificado votación" field="certificado_votacion" value={requisitos.certificado_votacion} />
+                  <ReqItem label="Foto carnet" field="foto_carnet" value={requisitos.foto_carnet} />
+                  <ReqItem label="Título estudios" field="titulo_estudios" value={requisitos.titulo_estudios} />
+
+                  <ReqItem label="Certificados cursos" field="certificados_cursos" value={requisitos.certificados_cursos} />
+                  <ReqItem label="Certificados laborales" field="certificados_laborales" value={requisitos.certificados_laborales} />
+                  <ReqItem label="Certificados honorabilidad" field="certificados_honorabilidad" value={requisitos.certificados_honorabilidad} />
+                  <ReqItem label="Historial IESS" field="historial_iess" value={requisitos.historial_iess} />
+                  <ReqItem label="Antecedentes penales" field="antecedentes_penales" value={requisitos.antecedentes_penales} />
+                  <ReqItem label="Certificado bancario" field="certificado_bancario" value={requisitos.certificado_bancario} />
+                  <ReqItem label="RUC" field="ruc" value={requisitos.ruc} />
+
+                  <ReqItem label="Discapacidad" field="certificado_discapacidad" value={requisitos.certificado_discapacidad} />
+                  <ReqItem label="Acta matrimonio" field="partida_matrimonio" value={requisitos.partida_matrimonio} />
+                  <ReqItem label="Nacimiento hijos" field="partida_nacimiento_hijos" value={requisitos.partida_nacimiento_hijos} />
+                </div>
+              </div>
+
+              {/* CTA volver */}
+              <div className="rounded-2xl p-4 border border-white/10 bg-white/5 shadow-xl backdrop-blur-md">
+                <button
+                  onClick={() => router.back()}
+                  className="w-full px-6 py-2 rounded-lg bg-white/10 hover:bg-white/15 text-white text-sm border border-white/10"
+                  type="button"
+                >
+                  Volver
+                </button>
+              </div>
             </div>
           </div>
         </div>
