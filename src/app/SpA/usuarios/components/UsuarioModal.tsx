@@ -4,8 +4,7 @@ import { useState } from "react";
 import { User, Mail, Lock, Unlock } from "lucide-react";
 
 interface UsuarioModalProps {
-     mode: "add" | "edit" | "view";
-
+  mode: "add" | "edit";
   user?: any;
   onClose: () => void;
   onAddUser?: (user: any) => void;
@@ -29,19 +28,17 @@ export default function UsuarioModal({
   const [fotoAsesor, setFotoAsesor] = useState<File | null>(null);
   const [cedulaFrontal, setCedulaFrontal] = useState<File | null>(null);
   const [cedulaReverso, setCedulaReverso] = useState<File | null>(null);
-const isView = mode === "view";
-const isEdit = mode === "edit";
 
-const [locked, setLocked] = useState({
-  nombre: isEdit || isView,
-  correo: isEdit || isView,
-  cedula: isEdit || isView,
-  rol: isEdit || isView,
-  password: true, // siempre inicia bloqueada
-  fotoAsesor: isEdit || isView,
-  cedulaFrontal: isEdit || isView,
-  cedulaReverso: isEdit || isView,
-});
+  const [locked, setLocked] = useState({
+    nombre: mode === "edit",
+    correo: mode === "edit",
+    cedula: mode === "edit",
+    rol: mode === "edit",
+    password: true, // por seguridad en edit, iniciar bloqueada
+    fotoAsesor: mode === "edit",
+    cedulaFrontal: mode === "edit",
+    cedulaReverso: mode === "edit",
+  });
 
   // ---------------- FUNCIONES ----------------
   const toggleLock = (field: keyof typeof locked) =>
@@ -213,6 +210,8 @@ const [locked, setLocked] = useState({
             >
               <option value="asesor">Asesor</option>
               <option value="admin">Administrador</option>
+              <option value="RRHH">RRHH</option>
+              <option value="RRHH">spa</option>
             </select>
             {mode === "edit" && (
               <button onClick={() => toggleLock("rol")}>

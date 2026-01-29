@@ -211,6 +211,7 @@ export default function UsuarioModal({
               <option value="asesor">Asesor</option>
               <option value="admin">Administrador</option>
               <option value="RRHH">RRHH</option>
+              <option value="RRHH">spa</option>
             </select>
             {mode === "edit" && (
               <button onClick={() => toggleLock("rol")}>
