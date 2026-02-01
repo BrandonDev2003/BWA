@@ -11,7 +11,6 @@ function getToken(req: NextRequest): string | null {
   const headerToken = req.headers.get("authorization")?.split(" ")[1];
   return cookieToken || headerToken || null;
 }
-
 // ============================================================
 // 🔹 GET - Obtener todos los leads (filtrado por estado o usuario)
 // ============================================================
@@ -40,7 +39,11 @@ export async function GET(req: NextRequest) {
         leads.codigo_pais,
         leads.meses_inversion,
         leads.monto_inversion,
-        users.nombre AS asignado_a
+        users.nombre AS asignado_a,
+
+        -- ✅ ESTE ES EL CAMPO REAL
+        leads.fecha AS fecha
+
       FROM leads
       LEFT JOIN users ON leads.asignado_a = users.id
     `;
@@ -63,10 +66,9 @@ export async function GET(req: NextRequest) {
 
     const result = await query(sql, params);
 
-    // 🔥 FIX IMPORTANTE
     return NextResponse.json({
       ok: true,
-      leads: Array.isArray(result.rows) ? result.rows : []
+      leads: Array.isArray(result.rows) ? result.rows : [],
     });
   } catch (error: any) {
     console.error("Error en GET /api/leads:", error);
@@ -76,6 +78,7 @@ export async function GET(req: NextRequest) {
     );
   }
 }
+
 
 // ============================================================
 // 🔹 POST - Crear nuevo lead

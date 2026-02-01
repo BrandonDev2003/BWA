@@ -1,75 +1,77 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 export function useLeads() {
-  const [leads, setLeads] = useState([]);
-  const [users, setUsers] = useState([]);
-  const [filtroEstado, setFiltroEstado] = useState("todos");
+  const [leads, setLeads] = useState<any[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
+
+  const [filtroEstado, setFiltroEstado] = useState<string>("todos");
+
   const [selectedLeads, setSelectedLeads] = useState<number[]>([]);
   const [showAssignUsers, setShowAssignUsers] = useState(false);
 
-  // Obtener leads
-  const fetchLeads = async () => {
-    try {
-      const res = await fetch("/api/leads", {
-        credentials: "include",
-      });
+  const didFetchUsers = useRef(false);
+  const didFetchLeads = useRef(false);
 
+  const fetchLeads = useCallback(async () => {
+    if (didFetchLeads.current) return;
+    didFetchLeads.current = true;
+
+    try {
+      const res = await fetch("/api/leads", { cache: "no-store" });
       const data = await res.json();
-
-      // 🔥 FIX: asegurar array
-      setLeads(Array.isArray(data.leads) ? data.leads : []);
-    } catch (err) {
-      console.error("Error al obtener leads:", err);
-      setLeads([]);
+      setLeads(data.leads || []);
+    } catch (e) {
+      console.error("fetchLeads error:", e);
     }
-  };
+  }, []);
 
-  // Obtener usuarios
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
+    if (didFetchUsers.current) return;
+    didFetchUsers.current = true;
+
     try {
-      const res = await fetch("/api/users", {
-        credentials: "include",
-      });
-
+      const res = await fetch("/api/users", { cache: "no-store" });
       const data = await res.json();
-
-      setUsers(Array.isArray(data.users) ? data.users : []);
-    } catch (err) {
-      console.error("Error al obtener usuarios:", err);
-      setUsers([]);
+      setUsers(data.users || []);
+    } catch (e) {
+      console.error("fetchUsers error:", e);
     }
-  };
+  }, []);
 
-  // Asignar leads
-  const handleAssign = async (userId: number) => {
-    try {
-      const res = await fetch("/api/leads/assigns", {
-        method: "PUT",
+  useEffect(() => {
+    fetchLeads();
+    fetchUsers();
+  }, [fetchLeads, fetchUsers]);
+
+  const handleAssign = useCallback(
+    async (userId: number) => {
+      const res = await fetch("/api/leads/assign", {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
         body: JSON.stringify({
           leadIds: selectedLeads,
-          asesorId: userId,
+          userId,
         }),
       });
 
-      if (!res.ok) throw new Error("Error asignando usuario");
-
-      // Refrescar la tabla
-      await fetchLeads();
-
-      setSelectedLeads([]);
-      setShowAssignUsers(false);
-    } catch (err) {
-      console.error(err);
-    }
-  };
+      if (res.ok) {
+        didFetchLeads.current = false;
+        await fetchLeads();
+        setSelectedLeads([]);
+        setShowAssignUsers(false);
+      }
+    },
+    [selectedLeads, fetchLeads]
+  );
 
   return {
     leads,
-    fetchLeads,
+    fetchLeads: async () => {
+      didFetchLeads.current = false;
+      await fetchLeads();
+    },
     filtroEstado,
     setFiltroEstado,
     selectedLeads,
@@ -77,7 +79,10 @@ export function useLeads() {
     showAssignUsers,
     setShowAssignUsers,
     users,
-    fetchUsers,
+    fetchUsers: async () => {
+      didFetchUsers.current = false;
+      await fetchUsers();
+    },
     handleAssign,
   };
 }

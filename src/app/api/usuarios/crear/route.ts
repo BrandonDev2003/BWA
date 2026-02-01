@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Token inválido" }, { status: 401 });
     }
 
-    if (!(decoded.rol === "admin" || decoded.rol === "administrador" || decoded.rol === "SpA" || decoded.rol === "rrhh"  || decoded.rol === "RRHH")) {
+    if (!(decoded.rol === "admin" || decoded.rol === "administrador" || decoded.rol === "SpA" || decoded.rol === "rrhh"  || decoded.rol === "RRHH" || decoded.rol === "spa" )) {
       return NextResponse.json(
         { error: "Solo admin puede crear" },
         { status: 403 }

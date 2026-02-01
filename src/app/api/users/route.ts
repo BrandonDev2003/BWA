@@ -23,40 +23,53 @@ export async function GET(req: NextRequest) {
 
     if (!token) {
       console.log("❌ No hay token");
-      return NextResponse.json({ ok: false, error: "No autorizado" }, { status: 401 });
+      return NextResponse.json(
+        { ok: false, error: "No autorizado" },
+        { status: 401 }
+      );
     }
 
-    let decoded;
+    let decoded: any;
     try {
       decoded = verify(token);
       console.log("Token decodificado:", decoded);
     } catch (e) {
       console.log("❌ Token inválido:", e);
-      return NextResponse.json({ ok: false, error: "Token inválido" }, { status: 401 });
+      return NextResponse.json(
+        { ok: false, error: "Token inválido" },
+        { status: 401 }
+      );
     }
 
     const userId = decoded.id;
-    const userRol = decoded.rol;
+    const userRol = String(decoded.rol || "").toLowerCase();
 
     console.log("Usuario autenticado:", userId, userRol);
 
     let query = "";
     let params: any[] = [];
 
-    if (userRol === "admin" || userRol === "administrador") {
+    // ✅ roles que pueden ver todos
+    const canSeeAll =
+      userRol === "admin" ||
+      userRol === "administrador" ||
+      userRol === "spa";
+
+    if (canSeeAll) {
       query = `
-        SELECT id, nombre, correo, cedula, rol, foto_asesor, cedula_frontal, cedula_reverso, asignado_a
+        SELECT id, nombre, correo, cedula, rol, foto_asesor, cedula_frontal, cedula_reverso
         FROM users
         ORDER BY id DESC
       `;
     } else {
+      // ✅ si NO es admin/spa: devolvemos solo asesores (para dropdown)
+      // (si prefieres devolver solo su propio usuario, dime y lo cambio)
       query = `
-        SELECT id, nombre, correo, cedula, rol, foto_asesor, cedula_frontal, cedula_reverso, asignado_a
+        SELECT id, nombre, correo, cedula, rol, foto_asesor, cedula_frontal, cedula_reverso
         FROM users
-        WHERE asignado_a = $1
+        WHERE LOWER(rol) LIKE '%asesor%'
         ORDER BY id DESC
       `;
-      params = [userId];
     }
 
     console.log("Ejecutando query:", query, params);
@@ -69,7 +82,10 @@ export async function GET(req: NextRequest) {
   } catch (e) {
     console.log("❌ ERROR COMPLETO EN GET /api/users:");
     console.log(e);
-    return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
+    return NextResponse.json(
+      { ok: false, error: "Error obteniendo usuarios" },
+      { status: 500 }
+    );
   }
 }
 
@@ -83,32 +99,41 @@ export async function POST(req: NextRequest) {
     const token = getToken(req);
 
     if (!token) {
-      return NextResponse.json({ ok: false, error: "No autorizado" }, { status: 401 });
+      return NextResponse.json(
+        { ok: false, error: "No autorizado" },
+        { status: 401 }
+      );
     }
 
-    let decoded;
+    let decoded: any;
     try {
       decoded = verify(token);
     } catch (e) {
-      return NextResponse.json({ ok: false, error: "Token inválido" }, { status: 401 });
+      return NextResponse.json(
+        { ok: false, error: "Token inválido" },
+        { status: 401 }
+      );
     }
 
-    const userRol = decoded.rol;
+    const userRol = String(decoded.rol || "").toLowerCase();
 
-    if (!(userRol === "admin" || userRol === "administrador")) {
-      return NextResponse.json({ ok: false, error: "Solo admin puede crear" }, { status: 403 });
+    if (!(userRol === "admin" || userRol === "administrador" || userRol === "spa")) {
+      return NextResponse.json(
+        { ok: false, error: "Solo admin puede crear" },
+        { status: 403 }
+      );
     }
 
     const body = await req.json();
-
     console.log("Body recibido:", body);
 
     const hashed = await hashPassword(body.password);
 
+    // ✅ IMPORTANTE: quitamos asignado_a porque NO existe en users
     const query = `
-      INSERT INTO users (nombre, correo, cedula, rol, password, foto_asesor, cedula_frontal, cedula_reverso, asignado_a)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-      RETURNING *
+      INSERT INTO users (nombre, correo, cedula, rol, password, foto_asesor, cedula_frontal, cedula_reverso)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+      RETURNING id, nombre, correo, cedula, rol, foto_asesor, cedula_frontal, cedula_reverso
     `;
 
     const values = [
@@ -120,7 +145,6 @@ export async function POST(req: NextRequest) {
       body.foto_asesor || null,
       body.cedula_frontal || null,
       body.cedula_reverso || null,
-      body.asignado_a || null,
     ];
 
     console.log("Ejecutando INSERT:", values);

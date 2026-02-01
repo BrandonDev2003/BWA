@@ -6,7 +6,7 @@ interface LeadCardProps {
     id?: number;
     nombre?: string;
     telefono?: string;
-    estado?: "Nuevo" | "Contactado" | "En Proceso" | "Cerrado";
+    estado?: "Nuevo" | "Contactado" | "En Proceso" | "Cerrado" | "Venta" ;
     correo?: string;
     empresa?: string;
     [key: string]: any;

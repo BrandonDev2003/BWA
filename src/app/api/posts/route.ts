@@ -9,11 +9,20 @@ function getToken(req: NextRequest) {
 }
 
 function verifyToken(token: string) {
-  return jwt.verify(token, process.env.JWT_SECRET || "") as any;
+  const secret = process.env.JWT_SECRET;
+  if (!secret) throw new Error("JWT_SECRET no configurado");
+  return jwt.verify(token, secret) as any;
 }
 
 function isAdminRole(rol: string) {
-  return rol === "admin" || rol === "administrador" || rol === "Administrador" || rol === "RRHH" || rol === "SpA";
+  return (
+    rol === "admin" ||
+    rol === "administrador" ||
+    rol === "Administrador" ||
+    rol === "RRHH" ||
+    rol === "SpA" ||
+    rol === "spa"
+  );
 }
 
 // ✅ helper para guardar archivos en /public/uploads
@@ -49,8 +58,9 @@ async function saveUpload(file: File, folder = "uploads") {
 export async function GET(req: NextRequest) {
   try {
     const token = getToken(req);
-    if (!token)
+    if (!token) {
       return NextResponse.json({ ok: false, error: "No autorizado" }, { status: 401 });
+    }
 
     const decoded = verifyToken(token);
 
@@ -64,23 +74,20 @@ export async function GET(req: NextRequest) {
         u.nombre AS author_nombre,
         u.rol AS author_rol,
 
-        -- ✅ adjuntos (requiere columnas en posts)
         p.image_url,
         p.document_url,
         p.document_name,
 
-        COALESCE(SUM(CASE WHEN pr.reaction='like' THEN 1 ELSE 0 END),0)::int AS likes,
-        COALESCE(SUM(CASE WHEN pr.reaction='love' THEN 1 ELSE 0 END),0)::int AS loves,
-        COALESCE(SUM(CASE WHEN pr.reaction='dislike' THEN 1 ELSE 0 END),0)::int AS dislikes,
-        COALESCE(SUM(CASE WHEN pr.reaction='haha' THEN 1 ELSE 0 END),0)::int AS hahas,
+        -- ✅ contadores por reacción
+        COUNT(*) FILTER (WHERE pr.reaction = 'like')::int    AS likes,
+        COUNT(*) FILTER (WHERE pr.reaction = 'love')::int    AS loves,
+        COUNT(*) FILTER (WHERE pr.reaction = 'dislike')::int AS dislikes,
+        COUNT(*) FILTER (WHERE pr.reaction = 'haha')::int    AS hahas,
 
-        (
-          SELECT reaction
-          FROM post_reactions
-          WHERE post_id = p.id AND user_id = $1
-        ) AS my_reaction,
+        -- ✅ mi reacción (0 o 1 valor)
+        MAX(pr_me.reaction) AS my_reaction,
 
-        -- ✅ usuarios por cada reacción
+        -- ✅ usuarios por cada reacción (máx 30)
         COALESCE((
           SELECT json_agg(x.nombre ORDER BY x.nombre)
           FROM (
@@ -129,12 +136,14 @@ export async function GET(req: NextRequest) {
           ) x
         ), '[]'::json) AS haha_users,
 
+        -- ✅ conteo comentarios
         (
           SELECT COUNT(*)::int
           FROM post_comments pc
           WHERE pc.post_id = p.id
         ) AS comments_count,
 
+        -- ✅ comentarios (máx 50)
         COALESCE((
           SELECT json_agg(
             json_build_object(
@@ -158,8 +167,26 @@ export async function GET(req: NextRequest) {
 
       FROM posts p
       JOIN users u ON u.id = p.user_id
+
+      -- reacciones para contar
       LEFT JOIN post_reactions pr ON pr.post_id = p.id
-      GROUP BY p.id, u.id
+
+      -- mi reacción (solo del usuario logueado)
+      LEFT JOIN post_reactions pr_me
+        ON pr_me.post_id = p.id AND pr_me.user_id = $1
+
+      GROUP BY
+        p.id,
+        p.contenido,
+        p.created_at,
+        p.user_id,
+        u.id,
+        u.nombre,
+        u.rol,
+        p.image_url,
+        p.document_url,
+        p.document_name
+
       ORDER BY p.created_at DESC
       LIMIT 50
       `,
@@ -180,21 +207,20 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const token = getToken(req);
-    if (!token)
+    if (!token) {
       return NextResponse.json({ ok: false, error: "No autorizado" }, { status: 401 });
+    }
 
     const decoded = verifyToken(token);
     if (!isAdminRole(decoded.rol)) {
       return NextResponse.json({ ok: false, error: "No autorizado" }, { status: 403 });
     }
 
-    // ✅ recibe FormData desde el frontend
     const formData = await req.formData();
     const contenido = String(formData.get("contenido") || "").trim();
     const imagen = formData.get("imagen");
     const documento = formData.get("documento");
 
-    // permite publicar con texto o archivo(s)
     if (!contenido && !(imagen instanceof File) && !(documento instanceof File)) {
       return NextResponse.json(
         { ok: false, error: "Contenido o archivo requerido" },
@@ -220,7 +246,6 @@ export async function POST(req: NextRequest) {
       document_name = saved.originalName;
     }
 
-    // ⚠️ requiere columnas en posts: image_url, document_url, document_name
     const result = await pool.query(
       `
       INSERT INTO posts (user_id, contenido, image_url, document_url, document_name)

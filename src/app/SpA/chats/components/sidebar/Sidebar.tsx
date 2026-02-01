@@ -12,6 +12,7 @@ import {
   Server,
   ClipboardList,
   Users,
+  User,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -28,6 +29,7 @@ const spaMenu = [
   { label: "Home", href: "/SpA/home", icon: Home },
   { label: "Leads", href: "/SpA/leads", icon: Mail },
   { label: "Leads Gestión", href: "/SpA/leadsgestion", icon: ClipboardList },
+  { label: "Mi cuenta", href: "/SpA/personal-account", icon: User  },
   { label: "Usuarios", href: "/SpA/usuarios", icon: Users },
 ];
 

@@ -15,7 +15,6 @@ interface Lead {
   telefono?: string;
   correo?: string;
 
-  // 👇 puede venir sucio desde API (null o string raro)
   estado?: EstadoLead | string | null;
 
   codigo_pais?: string;
@@ -23,7 +22,13 @@ interface Lead {
   meses_inversion?: number;
   monto_inversion?: number;
 
-  // opcional si tu API lo manda
+  // ✅ si en tu API viene alguna fecha
+  fecha?: string | null;
+  created_at?: string | null;
+  createdAt?: string | null;
+  fecha_creacion?: string | null;
+  fechaCreacion?: string | null;
+
   empresa?: string;
 
   [key: string]: any;
@@ -65,7 +70,7 @@ function safeEstado(v: any): EstadoLead | undefined {
 }
 
 // ---------------------------
-// ✅ helpers de filtro (más tolerante)
+// ✅ helpers de filtro
 // ---------------------------
 type Cat = "nuevo" | "en_proceso" | "contactado" | "cerrado" | "otro";
 
@@ -80,41 +85,37 @@ function norm(v: any) {
 function categoriaEstado(estadoRaw: any): Cat {
   const s = norm(estadoRaw);
 
-  if (
-    s === "cerrado" ||
-    s === "cerrada" ||
-    s.includes("cerrad") ||
-    s.includes("closed") ||
-    s.includes("won") ||
-    s.includes("ganado") ||
-    s.includes("finaliz") ||
-    s.includes("complet")
-  )
+  if (s.includes("cerr") || s.includes("closed") || s.includes("won") || s.includes("finaliz") || s.includes("complet"))
     return "cerrado";
 
-  if (
-    s === "contactado" ||
-    s === "contactada" ||
-    s.includes("contact") ||
-    s.includes("llamad") ||
-    s.includes("respond") ||
-    s.includes("respuesta") ||
-    s.includes("interes")
-  )
+  if (s.includes("contact") || s.includes("llamad") || s.includes("respond") || s.includes("respuesta") || s.includes("interes"))
     return "contactado";
 
-  if (
-    s === "en proceso" ||
-    s === "proceso" ||
-    s.includes("proceso") ||
-    s.includes("seguimiento") ||
-    s.includes("negoci")
-  )
-    return "en_proceso";
-
-  if (s === "nuevo" || s.includes("nuevo")) return "nuevo";
+  if (s.includes("proceso") || s.includes("seguimiento") || s.includes("negoci")) return "en_proceso";
+  if (s.includes("nuevo")) return "nuevo";
 
   return "otro";
+}
+
+// ✅ toma fecha desde el primer campo disponible
+function getLeadDateRaw(l: any) {
+  return l?.fecha ?? l?.created_at ?? l?.createdAt ?? l?.fecha_creacion ?? l?.fechaCreacion ?? null;
+}
+
+// ✅ convertir a YYYY-MM-DD (sin UTC)
+function toYMD(v: any) {
+  if (!v) return "";
+  const s = String(v).trim();
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+
+  const d = new Date(s);
+  if (Number.isNaN(d.getTime())) return "";
+
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
 }
 
 export default function LeadsGestion() {
@@ -123,18 +124,18 @@ export default function LeadsGestion() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // ✅ FIX Sidebar props
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
-  // ✅ filtro
+  // ✅ filtro estado
   const [filtroEstado, setFiltroEstado] = useState<EstadoFiltro>("todos");
 
-  // ✅ selección (si no la usas, puedes borrar)
-  const [selectedLeads, setSelectedLeads] = useState<number[]>([]);
+  // ✅ filtros nuevos
+  const [filtroNombre, setFiltroNombre] = useState("");
+  const [filtroCorreo, setFiltroCorreo] = useState("");
+  const [filtroFecha, setFiltroFecha] = useState(""); // YYYY-MM-DD
 
   const [openForm, setOpenForm] = useState(false);
 
-  // ✅ Ecuador por defecto
   const [form, setForm] = useState({
     nombre: "",
     apellido: "",
@@ -151,7 +152,7 @@ export default function LeadsGestion() {
   // ✅ cargar leads
   // ---------------------------
   useEffect(() => {
-    fetch("/api/leads/asesor", { credentials: "include" })
+    fetch("/api/leads/asesor", { credentials: "include", cache: "no-store" })
       .then(async (res) => {
         if (res.status === 401) {
           window.location.href = "/login";
@@ -159,37 +160,53 @@ export default function LeadsGestion() {
         }
 
         const data = await res.json().catch(() => ({}));
-
         const validLeads: Lead[] = (data.leads || []).filter(
           (lead: Lead) => lead && (lead.id || lead.nombre || lead.telefono)
         );
 
         setLeads(validLeads);
-
-        // ✅ limpia selección si ya no existe el lead
-        const ids = new Set(validLeads.map((l) => l.id).filter(Boolean) as number[]);
-        setSelectedLeads((prev) => prev.filter((id) => ids.has(id)));
       })
       .catch(() => setError("Error cargando datos"))
       .finally(() => setLoading(false));
   }, []);
 
   // ---------------------------
-  // ✅ filtro final
+  // ✅ filtro final (estado + nombre + correo + fecha)
   // ---------------------------
   const leadsFiltrados = useMemo(() => {
+    const fNom = norm(filtroNombre);
+    const fCor = norm(filtroCorreo);
+    const fFecha = String(filtroFecha || "").trim();
+
     return leads.filter((lead) => {
+      // estado
       const cat = categoriaEstado(lead.estado);
+      const okEstado =
+        filtroEstado === "todos"
+          ? true
+          : filtroEstado === "pendiente"
+          ? cat === "nuevo" || cat === "en_proceso"
+          : filtroEstado === "contactado"
+          ? cat === "contactado"
+          : filtroEstado === "cerrado"
+          ? cat === "cerrado"
+          : true;
 
-      if (filtroEstado === "todos") return true;
+      // nombre (nombre + apellido)
+      const fullName = `${lead.nombre ?? ""} ${lead.apellido ?? ""}`.trim();
+      const okNombre = !fNom ? true : norm(fullName).includes(fNom);
 
-      if (filtroEstado === "pendiente") return cat === "nuevo" || cat === "en_proceso";
-      if (filtroEstado === "contactado") return cat === "contactado";
-      if (filtroEstado === "cerrado") return cat === "cerrado";
+      // correo
+      const okCorreo = !fCor ? true : norm(lead.correo).includes(fCor);
 
-      return true;
+      // fecha exacta
+      const raw = getLeadDateRaw(lead);
+      const ymd = toYMD(raw);
+      const okFecha = !fFecha ? true : ymd === fFecha;
+
+      return okEstado && okNombre && okCorreo && okFecha;
     });
-  }, [leads, filtroEstado]);
+  }, [leads, filtroEstado, filtroNombre, filtroCorreo, filtroFecha]);
 
   // ---------------------------
   // ✅ crear lead
@@ -238,7 +255,6 @@ export default function LeadsGestion() {
       }
 
       const nuevo = data.lead as Lead;
-
       setLeads((prev) => [nuevo, ...prev]);
 
       setForm({
@@ -261,267 +277,305 @@ export default function LeadsGestion() {
     }
   }
 
-  // ---------------------------
-  // ✅ selección (si no la usas, puedes borrar)
-  // ---------------------------
-  function toggleSelect(id?: number) {
-    if (!id) return;
-    setSelectedLeads((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [id, ...prev]));
-  }
-
-  // ---------------------------
-  // ✅ UI
-  // ---------------------------
   if (loading) return <p className="p-6 text-white/80">Cargando...</p>;
   if (error) return <p className="p-6 text-red-400">{error}</p>;
 
   return (
-    <div className="flex min-h-screen">
-      {/* ✅ FIX: Sidebar requiere props */}
-      <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} />
+    <div
+      className="min-h-screen"
+      style={{
+        backgroundImage: `url(/fondobg.png)`,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        backgroundRepeat: "no-repeat",
+      }}
+    >
+      <div className="flex min-h-screen bg-black/55">
+        <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} />
 
-      <div className="flex-1 p-6">
-        <div className="flex items-center justify-between gap-4 mb-6">
-          <h1 className="text-2xl font-bold text-white">Gestión de Leads del Asesor</h1>
+        <div className="flex-1 p-6">
+          <div className="mx-auto w-full max-w-7xl">
+            <div className="rounded-3xl border border-white/10 bg-white/5 backdrop-blur-2xl shadow-2xl overflow-hidden">
+              {/* HEADER */}
+              <div className="p-6 border-b border-white/10 bg-black/25">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                  <div>
+                    <h1 className="text-3xl font-bold text-white">Gestión de Leads del Asesor</h1>
+                    <p className="text-sm text-white/60 mt-1">Filtra por estado y crea leads nuevos.</p>
+                  </div>
 
-          <button
-            onClick={() => setOpenForm(true)}
-            className="
-              px-4 py-2 rounded-xl
-              bg-emerald-500/90 text-white
-              hover:bg-emerald-500
-              border border-white/10
-              shadow-lg shadow-emerald-500/10
-              transition
-            "
-          >
-            + Agregar Lead
-          </button>
-        </div>
-
-        {/* ✅ FILTROS */}
-        <div className="flex flex-wrap items-center gap-3 mb-6">
-          <div className="flex flex-wrap gap-2">
-            <FilterBtn active={filtroEstado === "todos"} onClick={() => setFiltroEstado("todos")}>
-              Todos
-            </FilterBtn>
-            <FilterBtn active={filtroEstado === "pendiente"} onClick={() => setFiltroEstado("pendiente")}>
-              Pendientes
-            </FilterBtn>
-            <FilterBtn active={filtroEstado === "contactado"} onClick={() => setFiltroEstado("contactado")}>
-              Contactados
-            </FilterBtn>
-            <FilterBtn active={filtroEstado === "cerrado"} onClick={() => setFiltroEstado("cerrado")}>
-              Cerrados
-            </FilterBtn>
-          </div>
-        </div>
-
-        {/* ✅ LISTA */}
-        {leadsFiltrados.length === 0 ? (
-          <p className="text-white/70">No hay leads en esta categoría.</p>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {leadsFiltrados.map((lead) => {
-              // ✅ AQUI está el FIX del error: LeadCard NO acepta null/string en estado
-              const leadParaCard: LeadCardLead = {
-                ...lead,
-                estado: safeEstado(lead.estado),
-              };
-
-              return (
-                <div key={lead.id ?? `${lead.telefono ?? "tel"}-${lead.nombre ?? "lead"}`}>
-                  {/* Si quieres checkbox de selección, descomenta:
-                  <label className="flex items-center gap-2 mb-2 text-white/70 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={!!lead.id && selectedLeads.includes(lead.id)}
-                      onChange={() => toggleSelect(lead.id)}
-                    />
-                    Seleccionar
-                  </label>
-                  */}
-                  <LeadCard lead={leadParaCard} />
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {/* ✅ MODAL NUEVO LEAD */}
-        {openForm && (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
-            onClick={() => !saving && setOpenForm(false)}
-          >
-            <div
-              className="
-                w-full max-w-2xl rounded-3xl
-                border border-white/10
-                bg-white/5 backdrop-blur-2xl
-                shadow-2xl
-                p-6 text-white
-              "
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-start justify-between gap-4 mb-6">
-                <div>
-                  <h2 className="text-xl font-semibold">Nuevo Lead</h2>
-                  <p className="text-sm text-white/60 mt-1">asignado_a y origen se guardan automáticamente.</p>
+                  <button
+                    onClick={() => setOpenForm(true)}
+                    className="
+                      px-5 py-2.5 rounded-full
+                      bg-emerald-500/20 border border-emerald-400/20
+                      text-white font-semibold
+                      hover:bg-emerald-500/30 transition
+                      shadow-2xl
+                    "
+                    type="button"
+                  >
+                    + Agregar Lead
+                  </button>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => setOpenForm(false)}
-                  disabled={saving}
-                  className="
-                    h-9 w-9 rounded-xl
-                    border border-white/10
-                    bg-white/5
-                    hover:bg-white/10
-                    text-white/70 hover:text-white
-                    transition
-                  "
-                  aria-label="Cerrar"
-                  title="Cerrar"
-                >
-                  ✕
-                </button>
-              </div>
+                {/* ESTADO */}
+                <div className="mt-5 flex flex-wrap items-center gap-2">
+                  <FilterBtn active={filtroEstado === "todos"} onClick={() => setFiltroEstado("todos")}>
+                    Todos
+                  </FilterBtn>
+                  <FilterBtn active={filtroEstado === "pendiente"} onClick={() => setFiltroEstado("pendiente")}>
+                    Pendientes
+                  </FilterBtn>
+                  <FilterBtn active={filtroEstado === "contactado"} onClick={() => setFiltroEstado("contactado")}>
+                    Contactados
+                  </FilterBtn>
+                  <FilterBtn active={filtroEstado === "cerrado"} onClick={() => setFiltroEstado("cerrado")}>
+                    Cerrados
+                  </FilterBtn>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <InputField
-                  label="Nombre *"
-                  value={form.nombre}
-                  onChange={(v) => setForm((f) => ({ ...f, nombre: v }))}
-                  placeholder="Ej: Juan"
-                />
-
-                <InputField
-                  label="Apellido"
-                  value={form.apellido}
-                  onChange={(v) => setForm((f) => ({ ...f, apellido: v }))}
-                  placeholder="Ej: Pérez"
-                />
-
-                <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <InputField
-                    label="Código País"
-                    value={form.codigo_pais}
-                    maxLength={10}
-                    onChange={(v) => {
-                      if (v.length > 10) {
-                        alert("⚠ El código de país no puede superar 10 caracteres");
-                        return;
-                      }
-                      setForm((f) => ({ ...f, codigo_pais: v }));
-                    }}
-                    placeholder="+593"
-                  />
-
-                  <div className="md:col-span-2">
-                    <InputField
-                      label="Teléfono *"
-                      value={form.telefono}
-                      onChange={(v) => setForm((f) => ({ ...f, telefono: v }))}
-                      placeholder="0999999999"
-                    />
+                  <div className="ml-auto text-sm text-white/60">
+                    Total: <span className="text-white/85 font-semibold">{leadsFiltrados.length}</span>
                   </div>
                 </div>
 
-                <InputField
-                  label="Correo"
-                  value={form.correo}
-                  onChange={(v) => setForm((f) => ({ ...f, correo: v }))}
-                  placeholder="correo@empresa.com"
-                />
-
-                <InputField
-                  label="País"
-                  value={form.pais}
-                  onChange={(v) => setForm((f) => ({ ...f, pais: v }))}
-                  placeholder="Ecuador"
-                />
-
-                <div>
-                  <label className="text-sm text-white/70 mb-1 block">Estado</label>
-                  <select
-                    className="
-                      w-full rounded-2xl px-3 py-2
-                      bg-white/10 border border-white/10
-                      text-white
-                      focus:outline-none focus:ring-2 focus:ring-emerald-400/60
-                    "
-                    value={form.estado}
-                    onChange={(e) => setForm((f) => ({ ...f, estado: e.target.value as EstadoLead }))}
-                  >
-                    <option value="Nuevo" className="text-black">
-                      Nuevo
-                    </option>
-                    <option value="Contactado" className="text-black">
-                      Contactado
-                    </option>
-                    <option value="En Proceso" className="text-black">
-                      En Proceso
-                    </option>
-                    <option value="Cerrado" className="text-black">
-                      Cerrado
-                    </option>
-                  </select>
+                {/* ✅ FILTROS NUEVOS */}
+                <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <InputSearch
+                    placeholder="Filtrar por nombre..."
+                    value={filtroNombre}
+                    onChange={setFiltroNombre}
+                  />
+                  <InputSearch
+                    placeholder="Filtrar por correo..."
+                    value={filtroCorreo}
+                    onChange={setFiltroCorreo}
+                  />
+                  <div>
+                    <label className="text-xs text-white/60 mb-1 block">Filtrar por fecha</label>
+                    <input
+                      type="date"
+                      value={filtroFecha}
+                      onChange={(e) => setFiltroFecha(e.target.value)}
+                      className="
+                        w-full rounded-2xl px-4 py-2.5 text-sm
+                        bg-black/25 border border-white/10
+                        text-white/85
+                        focus:outline-none focus:ring-2 focus:ring-emerald-400/60
+                      "
+                    />
+                  </div>
                 </div>
-
-                <InputNumber
-                  label="Meses de inversión"
-                  value={form.meses_inversion}
-                  onChange={(v) => setForm((f) => ({ ...f, meses_inversion: v }))}
-                  placeholder="0"
-                />
-
-                <InputNumber
-                  label="Monto de inversión"
-                  value={form.monto_inversion}
-                  onChange={(v) => setForm((f) => ({ ...f, monto_inversion: v }))}
-                  placeholder="0"
-                />
               </div>
 
-              <div className="flex items-center justify-between gap-3 mt-6">
-                <p className="text-xs text-white/50">* Obligatorio: Nombre y Teléfono</p>
+              {/* LISTA */}
+              <div className="p-6">
+                {leadsFiltrados.length === 0 ? (
+                  <div className="rounded-2xl border border-white/10 bg-black/20 p-10 text-center">
+                    <p className="text-white/70">No hay leads para mostrar con este filtro.</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                    {leadsFiltrados.map((lead) => {
+                      const leadParaCard: LeadCardLead = {
+                        ...lead,
+                        estado: safeEstado(lead.estado),
+                      };
 
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => setOpenForm(false)}
-                    disabled={saving}
-                    className="
-                      px-4 py-2 rounded-2xl
-                      border border-white/15
-                      bg-white/5
-                      text-white/70 hover:text-white
-                      hover:bg-white/10
-                      transition
-                    "
-                  >
-                    Cancelar
-                  </button>
-
-                  <button
-                    onClick={crearLead}
-                    disabled={saving || !form.nombre.trim() || !form.telefono.trim()}
-                    className="
-                      px-5 py-2 rounded-2xl
-                      bg-emerald-500/90 text-white
-                      hover:bg-emerald-500
-                      disabled:opacity-50 disabled:cursor-not-allowed
-                      transition
-                    "
-                  >
-                    {saving ? "Guardando..." : "Guardar"}
-                  </button>
-                </div>
+                      // ✅ SIN contenedor extra y SIN "Seleccionar"
+                      return (
+                        <div key={lead.id ?? `${lead.telefono ?? "tel"}-${lead.nombre ?? "lead"}`}>
+                          <LeadCard lead={leadParaCard} />
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
           </div>
-        )}
+
+          {/* MODAL NUEVO LEAD */}
+          {openForm && (
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+              onClick={() => !saving && setOpenForm(false)}
+            >
+              <div
+                className="
+                  w-full max-w-2xl rounded-3xl
+                  border border-white/10
+                  bg-white/5 backdrop-blur-2xl
+                  shadow-2xl
+                  p-6 text-white
+                "
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-start justify-between gap-4 mb-6">
+                  <div>
+                    <h2 className="text-2xl font-bold">Nuevo Lead</h2>
+                    <p className="text-sm text-white/60 mt-1">
+                      asignado_a y origen se guardan automáticamente.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setOpenForm(false)}
+                    disabled={saving}
+                    className="
+                      h-10 w-10 rounded-2xl
+                      border border-white/10
+                      bg-white/5
+                      hover:bg-white/10
+                      text-white/70 hover:text-white
+                      transition
+                    "
+                    aria-label="Cerrar"
+                    title="Cerrar"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <InputField
+                    label="Nombre *"
+                    value={form.nombre}
+                    onChange={(v) => setForm((f) => ({ ...f, nombre: v }))}
+                    placeholder="Ej: Juan"
+                  />
+
+                  <InputField
+                    label="Apellido"
+                    value={form.apellido}
+                    onChange={(v) => setForm((f) => ({ ...f, apellido: v }))}
+                    placeholder="Ej: Pérez"
+                  />
+
+                  <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <InputField
+                      label="Código País"
+                      value={form.codigo_pais}
+                      maxLength={10}
+                      onChange={(v) => {
+                        if (v.length > 10) {
+                          alert("⚠ El código de país no puede superar 10 caracteres");
+                          return;
+                        }
+                        setForm((f) => ({ ...f, codigo_pais: v }));
+                      }}
+                      placeholder="+593"
+                    />
+
+                    <div className="md:col-span-2">
+                      <InputField
+                        label="Teléfono *"
+                        value={form.telefono}
+                        onChange={(v) => setForm((f) => ({ ...f, telefono: v }))}
+                        placeholder="0999999999"
+                      />
+                    </div>
+                  </div>
+
+                  <InputField
+                    label="Correo"
+                    value={form.correo}
+                    onChange={(v) => setForm((f) => ({ ...f, correo: v }))}
+                    placeholder="correo@empresa.com"
+                  />
+
+                  <InputField
+                    label="País"
+                    value={form.pais}
+                    onChange={(v) => setForm((f) => ({ ...f, pais: v }))}
+                    placeholder="Ecuador"
+                  />
+
+                  <div>
+                    <label className="text-sm text-white/70 mb-1 block">Estado</label>
+                    <select
+                      className="
+                        w-full rounded-2xl px-3 py-2.5
+                        bg-black/25 border border-white/10
+                        text-white
+                        focus:outline-none focus:ring-2 focus:ring-emerald-400/60
+                      "
+                      value={form.estado}
+                      onChange={(e) => setForm((f) => ({ ...f, estado: e.target.value as EstadoLead }))}
+                    >
+                      <option value="Nuevo" className="bg-[#0B0D10] text-white">
+                        Nuevo
+                      </option>
+                      <option value="Contactado" className="bg-[#0B0D10] text-white">
+                        Contactado
+                      </option>
+                      <option value="En Proceso" className="bg-[#0B0D10] text-white">
+                        En Proceso
+                      </option>
+                      <option value="Cerrado" className="bg-[#0B0D10] text-white">
+                        Cerrado
+                      </option>
+                    </select>
+                  </div>
+
+                  <InputNumber
+                    label="Meses de inversión"
+                    value={form.meses_inversion}
+                    onChange={(v) => setForm((f) => ({ ...f, meses_inversion: v }))}
+                    placeholder="0"
+                  />
+
+                  <InputNumber
+                    label="Monto de inversión"
+                    value={form.monto_inversion}
+                    onChange={(v) => setForm((f) => ({ ...f, monto_inversion: v }))}
+                    placeholder="0"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between gap-3 mt-6">
+                  <p className="text-xs text-white/50">* Obligatorio: Nombre y Teléfono</p>
+
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setOpenForm(false)}
+                      disabled={saving}
+                      className="
+                        px-4 py-2.5 rounded-full
+                        border border-white/15
+                        bg-white/5
+                        text-white/70 hover:text-white
+                        hover:bg-white/10
+                        transition
+                      "
+                      type="button"
+                    >
+                      Cancelar
+                    </button>
+
+                    <button
+                      onClick={crearLead}
+                      disabled={saving || !form.nombre.trim() || !form.telefono.trim()}
+                      className="
+                        px-6 py-2.5 rounded-full
+                        bg-emerald-500/20 border border-emerald-400/20
+                        text-white font-semibold
+                        hover:bg-emerald-500/30
+                        disabled:opacity-50 disabled:cursor-not-allowed
+                        transition
+                      "
+                      type="button"
+                    >
+                      {saving ? "Guardando..." : "Guardar"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          {/* /modal */}
+        </div>
       </div>
     </div>
   );
@@ -540,14 +594,41 @@ function FilterBtn({
     <button
       onClick={onClick}
       className={[
-        "px-4 py-2 rounded-2xl border transition",
+        "px-4 py-2 rounded-full border transition text-sm font-semibold",
         active
-          ? "bg-emerald-500/80 border-emerald-400/30 text-white"
+          ? "bg-emerald-500/20 border-emerald-400/20 text-white"
           : "bg-white/5 border-white/10 text-white/70 hover:bg-white/10 hover:text-white",
       ].join(" ")}
+      type="button"
     >
       {children}
     </button>
+  );
+}
+
+function InputSearch({
+  placeholder,
+  value,
+  onChange,
+}: {
+  placeholder: string;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <input
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      className="
+        w-full rounded-2xl border border-white/10 bg-black/25
+        px-4 py-2.5 text-sm text-white/85
+        placeholder:text-white/35 outline-none
+        focus:border-emerald-400/30 focus:ring-2 focus:ring-emerald-400/60
+        transition
+      "
+      type="text"
+    />
   );
 }
 
@@ -569,8 +650,8 @@ function InputField({
       <label className="text-sm text-white/70 mb-1 block">{label}</label>
       <input
         className="
-          w-full rounded-2xl px-3 py-2
-          bg-white/10 border border-white/10
+          w-full rounded-2xl px-3 py-2.5
+          bg-black/25 border border-white/10
           text-white placeholder:text-white/30
           focus:outline-none focus:ring-2 focus:ring-emerald-400/60
         "
@@ -600,8 +681,8 @@ function InputNumber({
       <input
         type="number"
         className="
-          w-full rounded-2xl px-3 py-2
-          bg-white/10 border border-white/10
+          w-full rounded-2xl px-3 py-2.5
+          bg-black/25 border border-white/10
           text-white placeholder:text-white/30
           focus:outline-none focus:ring-2 focus:ring-emerald-400/60
         "

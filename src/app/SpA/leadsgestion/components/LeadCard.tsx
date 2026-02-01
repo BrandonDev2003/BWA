@@ -62,7 +62,7 @@ export default function LeadCard({ lead }: LeadCardProps) {
             Detalles
           </button>
         </div>
-
+            
       </div>
     </div>
   );

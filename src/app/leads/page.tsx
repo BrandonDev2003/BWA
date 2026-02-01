@@ -40,7 +40,7 @@ export default function CRMHome() {
         if (!data.ok) return setAuthStatus("unauthorized");
         if (!data.user || !data.user.rol) return setAuthStatus("unauthorized");
 
-        if (data.user.rol === "admin" || data.user.rol === "Administrador") {
+        if (data.user.rol === "admin" || data.user.rol === "SpA" || data.user.rol === "rrhh" || data.user.rol === "RRHH" || data.user.rol === "Admin" || data.user.rol === "spa") {
           setAuthStatus("authorized");
         } else {
           setAuthStatus("unauthorized");

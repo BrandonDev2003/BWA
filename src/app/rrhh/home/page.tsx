@@ -2,9 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import Sidebar from "../usuarios/components/Sidebar";
+import Sidebar from "../home/components/Sidebar";
 
-type Reaction = "like" | "love" | "dislike" | "haha";
+type Reaction = "like";
 
 type Comment = {
   id: number;
@@ -24,16 +24,9 @@ type Post = {
   author_rol: string;
 
   likes: number;
-  loves: number;
-  dislikes: number;
-  hahas: number;
-
   my_reaction: Reaction | null;
 
   like_users: string[];
-  love_users: string[];
-  dislike_users: string[];
-  haha_users: string[];
 
   image_url?: string | null;
   document_url?: string | null;
@@ -44,7 +37,7 @@ type Post = {
 };
 
 function isAdminRole(rol?: string | null) {
-  return rol === "rrhh" || rol === "RRHH" || rol === "RRhh";
+  return rol === "SpA" || rol === "SPA" || rol === "spa";
 }
 
 function UsersTooltip({ users }: { users?: string[] }) {
@@ -76,7 +69,6 @@ function UsersTooltip({ users }: { users?: string[] }) {
 
 export default function HomePage() {
   const router = useRouter();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const [authStatus, setAuthStatus] = useState<
     "loading" | "authorized" | "unauthorized"
@@ -96,8 +88,6 @@ export default function HomePage() {
 
   const [commentDraft, setCommentDraft] = useState<Record<number, string>>({});
   const [openComments, setOpenComments] = useState<Record<number, boolean>>({});
-
-  const [openReactFor, setOpenReactFor] = useState<number | null>(null);
 
   useEffect(() => {
     const verifyUser = async () => {
@@ -137,14 +127,13 @@ export default function HomePage() {
 
       if (res.ok && data.ok) {
         const fixed = (Array.isArray(data.posts) ? data.posts : []).map(
-          (p: Post) => ({
+          (p: any) => ({
             ...p,
+            likes: Number(p.likes) || 0,
+            my_reaction: p.my_reaction === "like" ? ("like" as const) : null,
             like_users: Array.isArray(p.like_users) ? p.like_users : [],
-            love_users: Array.isArray(p.love_users) ? p.love_users : [],
-            dislike_users: Array.isArray(p.dislike_users)
-              ? p.dislike_users
-              : [],
-            haha_users: Array.isArray(p.haha_users) ? p.haha_users : [],
+            comments_count: Number(p.comments_count) || 0,
+            comments: Array.isArray(p.comments) ? p.comments : [],
           })
         );
 
@@ -193,23 +182,43 @@ export default function HomePage() {
     }
   };
 
-  const reactToPost = async (postId: number, reaction: Reaction) => {
+  // ✅ SOLO LIKE (toggle)
+  const toggleLike = async (postId: number) => {
     const current = posts.find((p) => p.id === postId)?.my_reaction ?? null;
-    const next = current === reaction ? null : reaction;
+    const next: Reaction | null = current === "like" ? null : "like";
 
+    // optimistic UI
     setPosts((prev) =>
-      prev.map((p) => (p.id === postId ? { ...p, my_reaction: next } : p))
+      prev.map((p) => {
+        if (p.id !== postId) return p;
+        const wasLiked = p.my_reaction === "like";
+        const nowLiked = next === "like";
+        const likes = Math.max(0, (Number(p.likes) || 0) + (nowLiked ? 1 : -1));
+        return { ...p, my_reaction: next, likes };
+      })
     );
 
-    await fetch("/api/posts/react", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ postId, reaction: next }),
-    });
+    try {
+      const res = await fetch("/api/posts/react", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ postId, reaction: next }),
+      });
 
-    setOpenReactFor(null);
-    await loadFeed();
+      if (!res.ok) {
+        // revert if backend fails
+        setPosts((prev) =>
+          prev.map((p) => (p.id === postId ? { ...p, my_reaction: current } : p))
+        );
+      }
+    } catch {
+      setPosts((prev) =>
+        prev.map((p) => (p.id === postId ? { ...p, my_reaction: current } : p))
+      );
+    } finally {
+      await loadFeed();
+    }
   };
 
   const sendComment = async (postId: number) => {
@@ -254,23 +263,15 @@ export default function HomePage() {
       className="min-h-screen text-white"
       style={{
         backgroundImage: "url('/fondo-bg.png')",
-        backgroundSize: "cover", // ✅ con zoom (llena toda la pantalla)
+        backgroundSize: "cover",
         backgroundPosition: "center",
         backgroundRepeat: "no-repeat",
         backgroundAttachment: "fixed",
       }}
     >
-      {/* overlay para legibilidad */}
       <div className="min-h-screen w-full bg-black/60">
         <div className="relative flex min-h-screen">
           <Sidebar />
-
-          {openReactFor !== null && (
-            <div
-              className="fixed inset-0 z-40"
-              onClick={() => setOpenReactFor(null)}
-            />
-          )}
 
           <main className="flex-1 p-6 md:p-8 relative z-10">
             <div className="max-w-3xl mx-auto space-y-6">
@@ -309,43 +310,17 @@ export default function HomePage() {
                     </div>
 
                     <div className="flex items-center gap-3 flex-wrap">
-                      <label
-                        className="
-                          text-sm
-                          rounded-xl
-                          border border-white/10
-                          bg-white/5
-                          px-3 py-2
-                          cursor-pointer
-                          text-white/75
-                          hover:bg-white/10 hover:text-white
-                          transition
-                        "
-                      >
+                      <label className="text-sm rounded-xl border border-white/10 bg-white/5 px-3 py-2 cursor-pointer text-white/75 hover:bg-white/10 hover:text-white transition">
                         📷 Imagen
                         <input
                           type="file"
                           accept="image/*"
                           className="hidden"
-                          onChange={(e) =>
-                            setImageFile(e.target.files?.[0] ?? null)
-                          }
+                          onChange={(e) => setImageFile(e.target.files?.[0] ?? null)}
                         />
                       </label>
 
-                      <label
-                        className="
-                          text-sm
-                          rounded-xl
-                          border border-white/10
-                          bg-white/5
-                          px-3 py-2
-                          cursor-pointer
-                          text-white/75
-                          hover:bg-white/10 hover:text-white
-                          transition
-                        "
-                      >
+                      <label className="text-sm rounded-xl border border-white/10 bg-white/5 px-3 py-2 cursor-pointer text-white/75 hover:bg-white/10 hover:text-white transition">
                         📄 Documento
                         <input
                           type="file"
@@ -390,8 +365,6 @@ export default function HomePage() {
                   {posts.map((p) => {
                     const canDelete =
                       isAdminRole(meRol) || (meId != null && meId === p.author_id);
-
-                    const bubbleOpen = openReactFor === p.id;
 
                     return (
                       <div
@@ -459,18 +432,6 @@ export default function HomePage() {
                                 <span>👍 {p.likes}</span>
                                 <UsersTooltip users={p.like_users} />
                               </span>
-                              <span className="relative group cursor-default">
-                                <span>❤️ {p.loves}</span>
-                                <UsersTooltip users={p.love_users} />
-                              </span>
-                              <span className="relative group cursor-default">
-                                <span>👎 {p.dislikes}</span>
-                                <UsersTooltip users={p.dislike_users} />
-                              </span>
-                              <span className="relative group cursor-default">
-                                <span>😂 {p.hahas}</span>
-                                <UsersTooltip users={p.haha_users} />
-                              </span>
                             </div>
 
                             <button
@@ -488,78 +449,18 @@ export default function HomePage() {
                           </div>
 
                           <div className="border-t border-white/10 pt-3 flex gap-2 relative z-50">
-                            <div className="relative flex-1">
-                              {bubbleOpen && (
-                                <div
-                                  className="
-                                    absolute left-0 -top-14
-                                    flex gap-2
-                                    rounded-full
-                                    border border-white/10
-                                    bg-white/5
-                                    backdrop-blur-2xl
-                                    shadow-2xl
-                                    px-3 py-2
-                                    z-[9999]
-                                  "
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  <span className="pointer-events-none absolute inset-0 rounded-full bg-black/30" />
-                                  <div className="relative flex gap-2">
-                                    <button
-                                      className="h-9 w-9 rounded-full hover:bg-white/10 transition"
-                                      onClick={() => reactToPost(p.id, "like")}
-                                      title="Me gusta"
-                                    >
-                                      👍
-                                    </button>
-                                    <button
-                                      className="h-9 w-9 rounded-full hover:bg-white/10 transition"
-                                      onClick={() => reactToPost(p.id, "love")}
-                                      title="Me encanta"
-                                    >
-                                      ❤️
-                                    </button>
-                                    <button
-                                      className="h-9 w-9 rounded-full hover:bg-white/10 transition"
-                                      onClick={() => reactToPost(p.id, "haha")}
-                                      title="Me da risa"
-                                    >
-                                      😂
-                                    </button>
-                                    <button
-                                      className="h-9 w-9 rounded-full hover:bg-white/10 transition"
-                                      onClick={() => reactToPost(p.id, "dislike")}
-                                      title="No me gusta"
-                                    >
-                                      👎
-                                    </button>
-                                  </div>
-                                </div>
-                              )}
-
-                              <button
-                                type="button"
-                                onMouseEnter={() => setOpenReactFor(p.id)}
-                                onClick={() => reactToPost(p.id, "like")}
-                                className={[
-                                  "w-full py-2.5 rounded-2xl font-semibold transition border",
-                                  p.my_reaction
-                                    ? "bg-emerald-500/15 border-emerald-400/20 text-white"
-                                    : "bg-white/5 border-white/10 text-white/75 hover:bg-white/10 hover:text-white",
-                                ].join(" ")}
-                              >
-                                {p.my_reaction === "love"
-                                  ? "❤️ Me encanta"
-                                  : p.my_reaction === "haha"
-                                  ? "😂 Me da risa"
-                                  : p.my_reaction === "dislike"
-                                  ? "👎 No me gusta"
-                                  : p.my_reaction === "like"
-                                  ? "👍 Me gusta"
-                                  : "👍 Like"}
-                              </button>
-                            </div>
+                            <button
+                              type="button"
+                              onClick={() => toggleLike(p.id)}
+                              className={[
+                                "flex-1 py-2.5 rounded-2xl font-semibold transition border",
+                                p.my_reaction === "like"
+                                  ? "bg-emerald-500/15 border-emerald-400/20 text-white"
+                                  : "bg-white/5 border-white/10 text-white/75 hover:bg-white/10 hover:text-white",
+                              ].join(" ")}
+                            >
+                              {p.my_reaction === "like" ? "👍 Te gusta" : "👍 Like"}
+                            </button>
 
                             <button
                               type="button"

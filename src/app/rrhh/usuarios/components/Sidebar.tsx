@@ -9,6 +9,7 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
+  User,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -22,6 +23,7 @@ type MeUser = {
 const rrhhMenu = [
   { label: "Inicio", href: "/rrhh/home", icon: Home },
   { label: "Chats", href: "/rrhh/chats", icon: MessageSquare },
+  { label: "Mi Cuenta", href: "/rrhh/personal-account", icon: User },
   { label: "Usuarios", href: "/rrhh/usuarios", icon: Users },
 ];
 

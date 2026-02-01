@@ -9,6 +9,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Folder,
+  User,
+  Database,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -20,9 +22,12 @@ type MeUser = {
 };
 
 const asesorMenu = [
-  { label: "Home", href: "/Asesor/home", icon: Folder },
-  { label: "Chats", href: "/Asesor/chats", icon: MessageSquare },
-  { label: "Leads Gestión", href: "/Asesor/leadsgestion", icon: ClipboardList },
+  { label: "Chats", href: "/Ventas/chats", icon: MessageSquare },
+  { label: "Dashboard", href: "/Ventas/dashboard", icon: Folder },
+  { label: "Home", href: "/Ventas/home", icon: Folder },
+  { label: "Leads", href: "/Ventas/leads", icon: Database },
+  { label: "Leads Gestión", href: "/Ventas/leadsgestion", icon: ClipboardList },
+  { label: "Mi cuenta", href: "/Ventas/personal-account", icon: User },
 ];
 
 type SidebarAsesorProps = {
