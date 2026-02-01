@@ -13,6 +13,7 @@ import {
   ClipboardList,
   Users,
   User,
+  FilePlus,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -35,6 +36,7 @@ const spaMenu = [
   { label: "Leads", href: "/SpA/leads", icon: Mail },
   { label: "Leads Gestión", href: "/SpA/leadsgestion", icon: ClipboardList },
   { label: "Mi cuenta", href: "/SpA/personal-account", icon: User  },
+  { label: "Venta", href: "/SpA/ventas", icon: FilePlus  },
   { label: "Usuarios", href: "/SpA/usuarios", icon: Users },
 ];
 

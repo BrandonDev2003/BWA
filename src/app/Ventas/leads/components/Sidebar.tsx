@@ -33,6 +33,7 @@ const adminVentasMenu = [
   { label: "Leads", href: "/Ventas/leads", icon: Database },
   { label: "Leads Gestión", href: "/Ventas/leadsgestion", icon: ClipboardList },
   { label: "Mi cuenta", href: "/Ventas/personal-account", icon: User },
+  { label: "Ventas", href: "/Ventas/ventas", icon: ClipboardList },
 ];
 
 export default function SidebarAdminVentas() {

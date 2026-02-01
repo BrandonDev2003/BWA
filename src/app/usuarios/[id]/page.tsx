@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { Trash2 } from "lucide-react";
 
 type UrlOrNull = string | null;
 
@@ -193,6 +194,27 @@ export default function UsuarioDetallePage() {
     setUploading(null);
   };
 
+  const deleteReqFile = async (field: ReqKey) => {
+    setUploading(field);
+
+    try {
+      const res = await fetch("/api/requisitos/delete-file", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ userId: id, field }),
+      });
+
+      const data = await res.json().catch(() => null);
+
+      if (res.ok && data?.ok) {
+        setRequisitos((prev) => (prev ? { ...prev, [field]: null } : prev));
+      }
+    } finally {
+      setUploading(null);
+    }
+  };
+
   const toggleNoAplica = async (field: ReqKey) => {
     const newValue = !noAplica[field];
 
@@ -212,9 +234,7 @@ export default function UsuarioDetallePage() {
     if (typeof value !== "string" || !value) return;
 
     const url =
-      value.startsWith("http") || value.startsWith("/")
-        ? value
-        : `/${value}`;
+      value.startsWith("http") || value.startsWith("/") ? value : `/${value}`;
 
     if (url.includes("res.cloudinary.com")) {
       const last = url.split("/").pop() || "";
@@ -328,6 +348,7 @@ export default function UsuarioDetallePage() {
     const optional = OPTIONAL_REQS.includes(field);
     const disabled = !!noAplica[field];
     const uploaded = !!value;
+    const isUploading = uploading === field;
 
     return (
       <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 space-y-3">
@@ -361,13 +382,26 @@ export default function UsuarioDetallePage() {
 
             <div className="flex flex-wrap items-center gap-2">
               {uploaded && (
-                <button
-                  type="button"
-                  onClick={() => downloadFile(value, field)}
-                  className="px-3 py-1.5 rounded-lg bg-emerald-600/90 hover:bg-emerald-600 text-white text-xs border border-white/10"
-                >
-                  Descargar
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={() => downloadFile(value, field)}
+                    className="px-3 py-1.5 rounded-lg bg-emerald-600/90 hover:bg-emerald-600 text-white text-xs border border-white/10"
+                  >
+                    Descargar
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => deleteReqFile(field)}
+                    disabled={isUploading}
+                    aria-label="Quitar documento"
+                    title="Quitar documento"
+                    className="inline-flex items-center justify-center h-8 w-8 rounded-lg bg-white/10 hover:bg-white/15 disabled:opacity-60 text-white border border-white/10"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </>
               )}
 
               <label className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-white text-xs border border-white/10 cursor-pointer">
@@ -381,8 +415,8 @@ export default function UsuarioDetallePage() {
                 />
               </label>
 
-              {uploading === field && (
-                <span className="text-xs text-blue-300">Subiendo...</span>
+              {isUploading && (
+                <span className="text-xs text-blue-300">Procesando...</span>
               )}
             </div>
           </>
@@ -425,7 +459,9 @@ export default function UsuarioDetallePage() {
           <input
             type="file"
             accept="image/*"
-            onChange={(e) => e.target.files && uploadImage(e.target.files[0], field)}
+            onChange={(e) =>
+              e.target.files && uploadImage(e.target.files[0], field)
+            }
             className="hidden"
           />
         </label>
@@ -582,23 +618,79 @@ export default function UsuarioDetallePage() {
 
                 {/* ✅ 2 columnas */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <ReqItem label="Hoja de vida" field="hoja_vida" value={requisitos.hoja_vida} />
-                  <ReqItem label="Copia cédula" field="copia_cedula" value={requisitos.copia_cedula} />
-                  <ReqItem label="Certificado votación" field="certificado_votacion" value={requisitos.certificado_votacion} />
-                  <ReqItem label="Foto carnet" field="foto_carnet" value={requisitos.foto_carnet} />
-                  <ReqItem label="Título estudios" field="titulo_estudios" value={requisitos.titulo_estudios} />
+                  <ReqItem
+                    label="Hoja de vida"
+                    field="hoja_vida"
+                    value={requisitos.hoja_vida}
+                  />
+                  <ReqItem
+                    label="Copia cédula"
+                    field="copia_cedula"
+                    value={requisitos.copia_cedula}
+                  />
+                  <ReqItem
+                    label="Certificado votación"
+                    field="certificado_votacion"
+                    value={requisitos.certificado_votacion}
+                  />
+                  <ReqItem
+                    label="Foto carnet"
+                    field="foto_carnet"
+                    value={requisitos.foto_carnet}
+                  />
+                  <ReqItem
+                    label="Título estudios"
+                    field="titulo_estudios"
+                    value={requisitos.titulo_estudios}
+                  />
 
-                  <ReqItem label="Certificados cursos" field="certificados_cursos" value={requisitos.certificados_cursos} />
-                  <ReqItem label="Certificados laborales" field="certificados_laborales" value={requisitos.certificados_laborales} />
-                  <ReqItem label="Certificados honorabilidad" field="certificados_honorabilidad" value={requisitos.certificados_honorabilidad} />
-                  <ReqItem label="Historial IESS" field="historial_iess" value={requisitos.historial_iess} />
-                  <ReqItem label="Antecedentes penales" field="antecedentes_penales" value={requisitos.antecedentes_penales} />
-                  <ReqItem label="Certificado bancario" field="certificado_bancario" value={requisitos.certificado_bancario} />
+                  <ReqItem
+                    label="Certificados cursos"
+                    field="certificados_cursos"
+                    value={requisitos.certificados_cursos}
+                  />
+                  <ReqItem
+                    label="Certificados laborales"
+                    field="certificados_laborales"
+                    value={requisitos.certificados_laborales}
+                  />
+                  <ReqItem
+                    label="Certificados honorabilidad"
+                    field="certificados_honorabilidad"
+                    value={requisitos.certificados_honorabilidad}
+                  />
+                  <ReqItem
+                    label="Historial IESS"
+                    field="historial_iess"
+                    value={requisitos.historial_iess}
+                  />
+                  <ReqItem
+                    label="Antecedentes penales"
+                    field="antecedentes_penales"
+                    value={requisitos.antecedentes_penales}
+                  />
+                  <ReqItem
+                    label="Certificado bancario"
+                    field="certificado_bancario"
+                    value={requisitos.certificado_bancario}
+                  />
                   <ReqItem label="RUC" field="ruc" value={requisitos.ruc} />
 
-                  <ReqItem label="Discapacidad" field="certificado_discapacidad" value={requisitos.certificado_discapacidad} />
-                  <ReqItem label="Acta matrimonio" field="partida_matrimonio" value={requisitos.partida_matrimonio} />
-                  <ReqItem label="Nacimiento hijos" field="partida_nacimiento_hijos" value={requisitos.partida_nacimiento_hijos} />
+                  <ReqItem
+                    label="Discapacidad"
+                    field="certificado_discapacidad"
+                    value={requisitos.certificado_discapacidad}
+                  />
+                  <ReqItem
+                    label="Acta matrimonio"
+                    field="partida_matrimonio"
+                    value={requisitos.partida_matrimonio}
+                  />
+                  <ReqItem
+                    label="Nacimiento hijos"
+                    field="partida_nacimiento_hijos"
+                    value={requisitos.partida_nacimiento_hijos}
+                  />
                 </div>
               </div>
 

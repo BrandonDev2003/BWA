@@ -11,6 +11,7 @@ import {
   Folder,
   User,
   Database,
+  BarChart3,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -23,11 +24,12 @@ type MeUser = {
 
 const asesorMenu = [
   { label: "Chats", href: "/Ventas/chats", icon: MessageSquare },
-  { label: "Dashboard", href: "/Ventas/dashboard", icon: Folder },
+  { label: "Dashboard", href: "/Ventas/dashboard", icon: BarChart3 },
   { label: "Home", href: "/Ventas/home", icon: Folder },
   { label: "Leads", href: "/Ventas/leads", icon: Database },
   { label: "Leads Gestión", href: "/Ventas/leadsgestion", icon: ClipboardList },
   { label: "Mi cuenta", href: "/Ventas/personal-account", icon: User },
+  { label: "Ventas", href: "/Ventas/ventas", icon: ClipboardList },
 ];
 
 type SidebarAsesorProps = {
