@@ -9,6 +9,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Folder,
+  User,
+  BadgeCheck,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -23,6 +25,8 @@ const asesorMenu = [
   { label: "Home", href: "/Asesor/home", icon: Folder },
   { label: "Chats", href: "/Asesor/chats", icon: MessageSquare },
   { label: "Leads Gestión", href: "/Asesor/leadsgestion", icon: ClipboardList },
+  { label: "Mi Cuenta", href: "/Asesor/personal-account", icon: User },
+  { label: "Ventas", href: "/Asesor/ventas", icon: BadgeCheck },
 ];
 
 type SidebarAsesorProps = {

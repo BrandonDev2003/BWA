@@ -414,7 +414,7 @@ export default function LeadDetailPage() {
       }}
     >
       <div className="flex min-h-screen bg-black/55">
-        <Sidebar />
+
 
         <div className="flex-1 p-6 relative">
           <div className="mx-auto w-full max-w-5xl rounded-3xl border border-white/10 bg-white/5 backdrop-blur-2xl shadow-2xl overflow-hidden">

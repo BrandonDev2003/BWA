@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
   if (!user) return jsonError("Unauthorized", 401);
 
   const rol = String(user.rol || "").toLowerCase();
-  const isAdmin = rol === "admin" || rol === "spa";
+  const isAdmin = rol === "admin" || rol === "spa" || rol === "SpA" || rol === "SPA";
   const userId = Number(user.id);
 
   const client = await pool.connect();
