@@ -2,14 +2,42 @@
 
 import { useState, useEffect, useCallback } from "react";
 
+export type EstadoLaboral = "ACTIVO" | "DESVINCULADO" | "RENUNCIA";
+
 export interface User {
   id: number;
   nombre: string;
-  correo: string;
+
+  // a veces correo / email según tu BD
+  correo?: string;
+  email?: string;
+
   rol: string;
   cedula?: string;
   puede_ver_todo?: boolean;
+
+  // ✅ laboral
+  estado_laboral?: EstadoLaboral;
+  motivo_salida?: string | null;
+  fecha_salida?: string | null;
+
+  motivo_reingreso?: string | null;
+  fecha_reingreso?: string | null;
+
   [key: string]: any;
+}
+
+function pickUsuarios(data: any): User[] {
+  // ✅ formato 1: { meta, rows }
+  if (Array.isArray(data?.rows)) return data.rows;
+
+  // ✅ formato 2: { usuarios: [...] }
+  if (Array.isArray(data?.usuarios)) return data.usuarios;
+
+  // ✅ formato 3: array directo
+  if (Array.isArray(data)) return data;
+
+  return [];
 }
 
 export function useUsuarios() {
@@ -17,27 +45,33 @@ export function useUsuarios() {
   const [loading, setLoading] = useState(false);
 
   // -------------------------------------------------
-  // CARGAR USUARIOS (USA COOKIE TOKEN AUTOMÁTICAMENTE)
+  // CARGAR USUARIOS
   // -------------------------------------------------
   const cargarUsuarios = useCallback(async () => {
     setLoading(true);
 
     try {
-      const res = await fetch("/api/usuarios/listar", {
+      // ✅ USA el endpoint correcto (el que devuelve estado_laboral)
+      // Si tu endpoint bueno es /api/usuarios (como en tu screenshot), usa ese.
+      const res = await fetch("/api/usuarios", {
         method: "GET",
         credentials: "include",
+        cache: "no-store",
       });
 
       const data = await res.json();
 
       if (!res.ok) {
-        console.error("Error cargando usuarios:", data.error);
+        console.error("Error cargando usuarios:", data?.error || data);
+        setUsuarios([]);
         return;
       }
 
-      setUsuarios(Array.isArray(data.usuarios) ? data.usuarios : []);
+      const list = pickUsuarios(data);
+      setUsuarios(list);
     } catch (err) {
       console.error("Error cargando usuarios:", err);
+      setUsuarios([]);
     } finally {
       setLoading(false);
     }
@@ -51,18 +85,16 @@ export function useUsuarios() {
       const res = await fetch("/api/usuarios/crear", {
         method: "POST",
         credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(usuario),
       });
 
       const data = await res.json();
 
       if (res.ok && data.user) {
-        setUsuarios((prev) => [...prev, data.user]);
+        setUsuarios((prev) => [data.user, ...prev]);
       } else {
-        console.error("Error creando usuario:", data.error);
+        console.error("Error creando usuario:", data?.error || data);
       }
     } catch (err) {
       console.error("Error creando usuario:", err);
@@ -77,9 +109,7 @@ export function useUsuarios() {
       const res = await fetch(`/api/usuarios/editar/${usuario.id}`, {
         method: "PUT",
         credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(usuario),
       });
 
@@ -90,7 +120,7 @@ export function useUsuarios() {
           prev.map((u) => (u.id === data.user.id ? data.user : u))
         );
       } else {
-        console.error("Error editando usuario:", data.error);
+        console.error("Error editando usuario:", data?.error || data);
       }
     } catch (err) {
       console.error("Error editando usuario:", err);

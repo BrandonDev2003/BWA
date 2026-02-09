@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import TrueFocus from "./components/TrueFocus";
-import bcrypt from "bcryptjs";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -12,12 +11,9 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // 🔥 BORRAR SESIÓN COMPLETA AL ENTRAR AL LOGIN
   useEffect(() => {
-    // 1. Llamar al backend para destruir cookies HTTPOnly
     fetch("/api/auth/logout").catch(() => {});
 
-    // 2. Borrar cookies visibles del navegador
     const cookies = document.cookie.split(";");
     for (const cookie of cookies) {
       const eqPos = cookie.indexOf("=");
@@ -25,7 +21,6 @@ export default function LoginPage() {
       document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
     }
 
-    // 3. Borrar token u otros datos locales
     localStorage.removeItem("token");
   }, []);
 
@@ -39,13 +34,17 @@ export default function LoginPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ correo, password }),
-        credentials: "include", // ✅ importante si tu backend setea cookie session
+        credentials: "include",
       });
 
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.error || "Error al iniciar sesión");
+        if (res.status === 403) {
+          setError("Tu usuario no está ACTIVO. Contacta a RRHH.");
+        } else {
+          setError(data.error || "Error al iniciar sesión");
+        }
         return;
       }
 
@@ -53,30 +52,26 @@ export default function LoginPage() {
 
       const rol = String(data?.user?.rol || "").toLowerCase();
 
-    if (rol === "SpA" || rol === "super-admin" || rol === "spa") {
-      router.replace("/SpA/home");
-    } else if (rol === "admin" || rol === "administrador") {
-      router.replace("/Ventas/home");
-    } else if (rol === "rrhh") {
-      router.replace("/rrhh/home");
-    } else if (rol === "asesor") {
-      router.replace("/Asesor/home");
-    } else {
-      router.replace("/usuarios/home");
-    }
-
-    } catch (err) {
+      if (rol === "SpA" || rol === "super-admin" || rol === "spa") {
+        router.replace("/SpA/home");
+      } else if (rol === "admin" || rol === "administrador") {
+        router.replace("/Ventas/home");
+      } else if (rol === "rrhh") {
+        router.replace("/rrhh/home");
+      } else if (rol === "asesor") {
+        router.replace("/Asesor/home");
+      } else {
+        router.replace("/usuarios/home");
+      }
+    } catch {
       setError("Error de conexión con el servidor");
     } finally {
       setLoading(false);
     }
   };
 
-
   return (
     <div className="w-full h-screen bg-black flex">
-
-      {/* Lado izquierdo con logo */}
       <div className="flex-1 flex items-center justify-center">
         <img
           src="/bw.png"
@@ -85,11 +80,8 @@ export default function LoginPage() {
         />
       </div>
 
-      {/* Lado derecho con login */}
       <div className="w-[50%] flex items-center justify-center relative">
-
         <div className="relative w-[340px] p-10 rounded-xl bg-black/40 backdrop-blur-xl border border-white/10 shadow-xl">
-
           <div className="flex justify-center mb-6">
             <TrueFocus
               sentence="BLACKWOOD ALLIANCE"
@@ -105,7 +97,6 @@ export default function LoginPage() {
           <div className="absolute -inset-0.5 rounded-xl border border-gray-700 animate-glow pointer-events-none"></div>
 
           <form onSubmit={handleLogin} className="space-y-5">
-
             <div>
               <label className="block text-sm text-gray-300 mb-1 font-light tracking-tight">
                 Correo electrónico
@@ -158,22 +149,13 @@ export default function LoginPage() {
         </div>
       </div>
 
-      {/* Animación del borde */}
       <style jsx>{`
         @keyframes glow {
-          0% {
-            box-shadow: 0 0 8px rgba(0, 153, 255, 0.15);
-          }
-          50% {
-            box-shadow: 0 0 18px rgba(0, 153, 255, 0.4);
-          }
-          100% {
-            box-shadow: 0 0 8px rgba(0, 153, 255, 0.15);
-          }
+          0% { box-shadow: 0 0 8px rgba(0, 153, 255, 0.15); }
+          50% { box-shadow: 0 0 18px rgba(0, 153, 255, 0.4); }
+          100% { box-shadow: 0 0 8px rgba(0, 153, 255, 0.15); }
         }
-        .animate-glow {
-          animation: glow 2.8s infinite ease-in-out;
-        }
+        .animate-glow { animation: glow 2.8s infinite ease-in-out; }
       `}</style>
     </div>
   );

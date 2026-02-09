@@ -40,7 +40,8 @@ export default function UsuariosPage() {
   // --- Filtrado ---
   const usuariosFiltrados = useMemo(() => {
     return usuarios.filter((u) => {
-      const matchCorreo = (u.correo || "").includes(filterCorreo);
+      const correo = (u.correo ?? u.email ?? "").toString();
+      const matchCorreo = correo.includes(filterCorreo);
       const matchRol = filterRol ? u.rol === filterRol : true;
       return matchCorreo && matchRol;
     });
@@ -109,10 +110,12 @@ export default function UsuariosPage() {
   // --------------------------
   const handleEditUser = async (user: User) => {
     try {
+      const correo = (user.correo ?? user.email ?? "").toString();
+
       const otpRes = await fetch("/api/auth/send-edit-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ correo: user.correo }),
+        body: JSON.stringify({ correo }),
       });
 
       const otpData = await otpRes.json();
@@ -131,11 +134,13 @@ export default function UsuariosPage() {
     if (!otpUser) return;
 
     try {
+      const correo = (otpUser.correo ?? otpUser.email ?? "").toString();
+
       const verifyRes = await fetch("/api/auth/verify-edit-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          correo: otpUser.correo,
+          correo,
           otp: otpInput,
         }),
       });
@@ -154,42 +159,6 @@ export default function UsuariosPage() {
     }
   };
 
-  // --------------------------
-  //    OTP PARA ELIMINAR
-  // --------------------------
-  const handleDeleteUser = async (user: User) => {
-    try {
-      const otpRes = await fetch("/api/auth/send-delete-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ correo: user.correo }),
-      });
-
-      const otpData = await otpRes.json();
-      if (!otpRes.ok || !otpData.ok) return alert("Error enviando OTP");
-
-      const inputOtp = prompt(
-        `Se envió un código de 6 dígitos al correo ${user.correo}. Ingresa el OTP:`
-      );
-      if (!inputOtp) return;
-
-      const delRes = await fetch("/api/users/delete", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ correo: user.correo, otp: inputOtp }),
-      });
-
-      const delData = await delRes.json();
-
-      if (!delRes.ok || !delData.ok) return alert("OTP inválido o expirado");
-
-      alert("Usuario eliminado exitosamente");
-      cargarUsuarios();
-    } catch {
-      alert("Error eliminando usuario");
-    }
-  };
-
   return (
     <div
       className="min-h-screen text-white"
@@ -203,7 +172,6 @@ export default function UsuariosPage() {
     >
       <div className="min-h-screen w-full bg-black/60">
         <div className="relative flex min-h-screen">
-          {/* Si tu Sidebar no recibe props, déjalo como <Sidebar /> */}
           <Sidebar />
 
           <main className="flex-1 p-4 md:p-8">
@@ -282,13 +250,7 @@ export default function UsuariosPage() {
                   No hay asesores que coincidan con los filtros.
                 </p>
               ) : (
-                <UsuariosTable
-                  usuarios={usuariosFiltrados}
-                  onEdit={handleEditUser}
-                  // Si tu tabla soporta esto, perfecto:
-                
-                 
-                />
+                <UsuariosTable usuarios={usuariosFiltrados} onEdit={handleEditUser} />
               )}
             </motion.div>
           </main>
@@ -315,12 +277,11 @@ export default function UsuariosPage() {
             <div className="fixed inset-0 flex items-center justify-center bg-black/70 backdrop-blur-sm z-50 p-4">
               <div className="w-80 rounded-3xl border border-white/10 bg-white/5 backdrop-blur-2xl shadow-2xl overflow-hidden relative">
                 <div className="pointer-events-none absolute inset-0 bg-black/35" />
-
                 <div className="relative p-6">
                   <h2 className="text-lg font-bold mb-3 text-center text-white/90">
                     Ingresa el OTP enviado a
                     <div className="text-sm font-semibold text-white/70 mt-1 break-all">
-                      {otpUser.correo}
+                      {(otpUser.correo ?? otpUser.email ?? "").toString()}
                     </div>
                   </h2>
 

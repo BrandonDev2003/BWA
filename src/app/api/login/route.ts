@@ -5,18 +5,39 @@ import { comparePassword, signToken } from "@/lib/auth";
 export async function POST(req: NextRequest) {
   const { correo, password } = await req.json();
 
-  if (!correo || !password)
-    return NextResponse.json({ error: "Faltan campos obligatorios" }, { status: 400 });
+  if (!correo || !password) {
+    return NextResponse.json(
+      { error: "Faltan campos obligatorios" },
+      { status: 400 }
+    );
+  }
 
   const result = await query("SELECT * FROM users WHERE correo = $1", [correo]);
   const user = result.rows[0];
 
-  if (!user)
-    return NextResponse.json({ error: "Usuario no encontrado" }, { status: 404 });
+  if (!user) {
+    return NextResponse.json(
+      { error: "Usuario no encontrado" },
+      { status: 404 }
+    );
+  }
+
+  // ✅ SOLO PERMITIR LOGIN SI ESTÁ ACTIVO
+  // (si estado_laboral es null/undefined, también se bloquea)
+  if (user.estado_laboral !== "ACTIVO") {
+    return NextResponse.json(
+      { error: "Usuario no activo. Contacte a RRHH." },
+      { status: 403 }
+    );
+  }
 
   const isValid = await comparePassword(password, user.password);
-  if (!isValid)
-    return NextResponse.json({ error: "Contraseña incorrecta" }, { status: 401 });
+  if (!isValid) {
+    return NextResponse.json(
+      { error: "Contraseña incorrecta" },
+      { status: 401 }
+    );
+  }
 
   const token = signToken({
     id: user.id,

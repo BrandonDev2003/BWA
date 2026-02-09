@@ -16,72 +16,90 @@ function verify(token: string) {
 // ---------------------------
 export async function GET(req: NextRequest) {
   try {
-    console.log("➡️ Ejecutando GET /api/users");
-
     const token = getToken(req);
-    console.log("Token recibido:", token);
 
     if (!token) {
-      console.log("❌ No hay token");
-      return NextResponse.json(
-        { ok: false, error: "No autorizado" },
-        { status: 401 }
-      );
+      return NextResponse.json({ ok: false, error: "No autorizado" }, { status: 401 });
     }
 
     let decoded: any;
     try {
       decoded = verify(token);
-      console.log("Token decodificado:", decoded);
-    } catch (e) {
-      console.log("❌ Token inválido:", e);
-      return NextResponse.json(
-        { ok: false, error: "Token inválido" },
-        { status: 401 }
-      );
+    } catch {
+      const res = NextResponse.json({ ok: false, error: "Token inválido" }, { status: 401 });
+      res.cookies.set("token", "", { path: "/", maxAge: 0 });
+      return res;
     }
 
     const userId = decoded.id;
     const userRol = String(decoded.rol || "").toLowerCase();
 
-    console.log("Usuario autenticado:", userId, userRol);
+    // ✅ (opcional pero recomendado) validar en BD que quien consulta siga ACTIVO
+    const authCheck = await pool.query(
+      `SELECT id, estado_laboral FROM users WHERE id = $1 LIMIT 1`,
+      [userId]
+    );
 
-    let query = "";
-    let params: any[] = [];
+    const me = authCheck.rows[0];
+    if (!me || me.estado_laboral !== "ACTIVO") {
+      const res = NextResponse.json(
+        { ok: false, error: "Usuario no activo" },
+        { status: 403 }
+      );
+      res.cookies.set("token", "", { path: "/", maxAge: 0 });
+      return res;
+    }
 
-    // ✅ roles que pueden ver todos
     const canSeeAll =
       userRol === "admin" ||
       userRol === "administrador" ||
       userRol === "spa";
 
+    const baseSelect = `
+      SELECT
+        id,
+        nombre,
+        correo,
+        cedula,
+        rol,
+        foto_asesor,
+        cedula_frontal,
+        cedula_reverso,
+
+        -- ✅ laboral (ESTO ARREGLA TU REFRESH)
+        estado_laboral,
+        motivo_salida,
+        fecha_salida,
+        motivo_reingreso,
+        fecha_reingreso
+      FROM users
+    `;
+
+    let sql = "";
+    let params: any[] = [];
+
     if (canSeeAll) {
-      query = `
-        SELECT id, nombre, correo, cedula, rol, foto_asesor, cedula_frontal, cedula_reverso
-        FROM users
+      sql = `
+        ${baseSelect}
         ORDER BY id DESC
       `;
     } else {
-      // ✅ si NO es admin/spa: devolvemos solo asesores (para dropdown)
-      // (si prefieres devolver solo su propio usuario, dime y lo cambio)
-      query = `
-        SELECT id, nombre, correo, cedula, rol, foto_asesor, cedula_frontal, cedula_reverso
-        FROM users
+      sql = `
+        ${baseSelect}
         WHERE LOWER(rol) LIKE '%asesor%'
         ORDER BY id DESC
       `;
     }
 
-    console.log("Ejecutando query:", query, params);
+    const result = await pool.query(sql, params);
 
-    const result = await pool.query(query, params);
-
-    console.log("Usuarios obtenidos:", result.rows.length);
-
-    return NextResponse.json({ ok: true, users: result.rows });
+    return NextResponse.json({
+      ok: true,
+      meta: { total: result.rowCount },
+      users: result.rows,
+    });
   } catch (e) {
-    console.log("❌ ERROR COMPLETO EN GET /api/users:");
-    console.log(e);
+    console.log("❌ ERROR EN GET /api/users:", e);
     return NextResponse.json(
       { ok: false, error: "Error obteniendo usuarios" },
       { status: 500 }
@@ -94,25 +112,19 @@ export async function GET(req: NextRequest) {
 // ---------------------------
 export async function POST(req: NextRequest) {
   try {
-    console.log("➡️ Ejecutando POST /api/users");
-
     const token = getToken(req);
 
     if (!token) {
-      return NextResponse.json(
-        { ok: false, error: "No autorizado" },
-        { status: 401 }
-      );
+      return NextResponse.json({ ok: false, error: "No autorizado" }, { status: 401 });
     }
 
     let decoded: any;
     try {
       decoded = verify(token);
-    } catch (e) {
-      return NextResponse.json(
-        { ok: false, error: "Token inválido" },
-        { status: 401 }
-      );
+    } catch {
+      const res = NextResponse.json({ ok: false, error: "Token inválido" }, { status: 401 });
+      res.cookies.set("token", "", { path: "/", maxAge: 0 });
+      return res;
     }
 
     const userRol = String(decoded.rol || "").toLowerCase();
@@ -125,15 +137,19 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    console.log("Body recibido:", body);
-
     const hashed = await hashPassword(body.password);
 
-    // ✅ IMPORTANTE: quitamos asignado_a porque NO existe en users
-    const query = `
-      INSERT INTO users (nombre, correo, cedula, rol, password, foto_asesor, cedula_frontal, cedula_reverso)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-      RETURNING id, nombre, correo, cedula, rol, foto_asesor, cedula_frontal, cedula_reverso
+    const sql = `
+      INSERT INTO users (
+        nombre, correo, cedula, rol, password,
+        foto_asesor, cedula_frontal, cedula_reverso,
+        estado_laboral
+      )
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8, COALESCE($9,'ACTIVO'))
+      RETURNING
+        id, nombre, correo, cedula, rol,
+        foto_asesor, cedula_frontal, cedula_reverso,
+        estado_laboral, motivo_salida, fecha_salida, motivo_reingreso, fecha_reingreso
     `;
 
     const values = [
@@ -145,16 +161,14 @@ export async function POST(req: NextRequest) {
       body.foto_asesor || null,
       body.cedula_frontal || null,
       body.cedula_reverso || null,
+      body.estado_laboral || "ACTIVO",
     ];
 
-    console.log("Ejecutando INSERT:", values);
-
-    const result = await pool.query(query, values);
+    const result = await pool.query(sql, values);
 
     return NextResponse.json({ ok: true, user: result.rows[0] });
   } catch (e) {
-    console.log("❌ ERROR COMPLETO EN POST /api/users:");
-    console.log(e);
+    console.log("❌ ERROR EN POST /api/users:", e);
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }
 }

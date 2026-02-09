@@ -40,11 +40,10 @@ export default function LeadTable() {
 
   const norm = (v: any) => String(v ?? "").toLowerCase().trim();
 
-  // ✅ Convierte cualquier fecha a YYYY-MM-DD sin usar UTC (evita el “corrimiento” de día)
+  // ✅ Convierte cualquier fecha a YYYY-MM-DD sin UTC (evita corrimiento de día)
   const toYMD = (v: any) => {
     if (!v) return "";
 
-    // timestamp number (segundos o ms)
     if (typeof v === "number") {
       const ms = v < 10_000_000_000 ? v * 1000 : v;
       const d = new Date(ms);
@@ -56,7 +55,6 @@ export default function LeadTable() {
     }
 
     const s = String(v).trim();
-    // ya viene en YYYY-MM-DD
     if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
 
     const d = new Date(s);
@@ -68,8 +66,7 @@ export default function LeadTable() {
     return `${yyyy}-${mm}-${dd}`;
   };
 
-  // ✅ El problema real: muchas veces no viene "fecha", viene con otro nombre.
-  // Aquí tomamos el primer campo disponible.
+  // ✅ fecha flexible: toma el primer campo existente
   const getLeadDateRaw = (l: any) => {
     return (
       l?.fecha ??
@@ -102,20 +99,29 @@ export default function LeadTable() {
     }));
   }, [leads]);
 
-  // ✅ mapa nombre->id y id->nombre (para asignar/quitar y mostrar bonito)
+  // ✅ helper: asesor activo
+  const isAsesorActivo = (u: any) => {
+    const rol = String(u?.rol ?? "").toLowerCase();
+    const estado = String(u?.estado_laboral ?? "ACTIVO").toUpperCase();
+    return rol.includes("asesor") && estado === "ACTIVO";
+  };
+
+  // ✅ mapa nombre->id y id->nombre (SOLO asesores ACTIVOS)
   const { asesorNameToId, asesorIdToName } = useMemo(() => {
     const arr = Array.isArray(users) ? (users as any[]) : [];
-    const isAsesor = (u: any) => String(u?.rol ?? "").toLowerCase().includes("asesor");
     const nameOf = (u: any) => String(u?.nombre ?? u?.correo ?? "").trim();
 
     const nameToId = new Map<string, number>();
     const idToName = new Map<number, string>();
 
     for (const u of arr) {
-      if (!isAsesor(u)) continue;
+      if (!isAsesorActivo(u)) continue;
+
       const name = nameOf(u);
       const id = Number(u?.id);
-      if (!name || !id) continue;
+
+      if (!name || !Number.isFinite(id)) continue;
+
       nameToId.set(norm(name), id);
       idToName.set(id, name);
     }
@@ -123,18 +129,17 @@ export default function LeadTable() {
     return { asesorNameToId: nameToId, asesorIdToName: idToName };
   }, [users]);
 
-  // ✅ lista de asesores por NOMBRE
+  // ✅ lista de asesores por NOMBRE (SOLO ACTIVOS)
   const asesores = useMemo(() => {
     const arr = Array.isArray(users) ? (users as any[]) : [];
-    const isAsesor = (u: any) => String(u?.rol ?? "").toLowerCase().includes("asesor");
     const nameOf = (u: any) => String(u?.nombre ?? u?.correo ?? "").trim();
 
-    const names = arr.filter(isAsesor).map(nameOf).filter(Boolean);
+    const names = arr.filter(isAsesorActivo).map(nameOf).filter(Boolean);
     const unique = Array.from(new Set(names)).sort((a, b) => a.localeCompare(b, "es"));
     return ["todos", ...unique];
   }, [users]);
 
-  // ✅ helper: obtener nombre asignado aunque venga como ID o como nombre
+  // ✅ obtener nombre asignado aunque venga como ID o como nombre
   const asignadoNombre = (asignado_a: any) => {
     if (asignado_a == null || asignado_a === "") return "Sin asignar";
 
@@ -147,7 +152,7 @@ export default function LeadTable() {
     return s ? s : "Sin asignar";
   };
 
-  // ✅ filtro total (fecha corregida + campo fecha flexible)
+  // ✅ filtro total
   const leadsFiltrados = useMemo(() => {
     return leadsNormalizados.filter((l) => {
       const okEstado = filtroEstado === "todos" ? true : l.estado === filtroEstado;
@@ -196,6 +201,7 @@ export default function LeadTable() {
 
   // ✅ Import
   const onImportClick = () => fileRef.current?.click();
+
   const onImportFile = async (file: File) => {
     const form = new FormData();
     form.append("file", file);
@@ -207,7 +213,7 @@ export default function LeadTable() {
     if (res.ok) await fetchLeads();
   };
 
-  // ✅ Random equitable (endpoint)
+  // ✅ Random equitable
   const assignRandomEquitable = async () => {
     const res = await fetch("/api/leads/assign-random-equitable", {
       method: "POST",
@@ -276,7 +282,6 @@ export default function LeadTable() {
     try {
       setDeletingId(id);
 
-      // ⚠️ Cambia la ruta si tu API es distinta
       const res = await fetch(`/api/leads/${id}`, {
         method: "DELETE",
         credentials: "include",
@@ -289,7 +294,6 @@ export default function LeadTable() {
         return;
       }
 
-      // refrescar lista
       await fetchLeads();
       setSelectedLeads((prev) => prev.filter((x) => x !== id));
     } finally {
@@ -538,7 +542,6 @@ export default function LeadTable() {
                     </span>
                   </td>
 
-                  {/* ✅ Fecha ahora toma el primer campo existente */}
                   <td className="p-3 text-white/70 whitespace-nowrap">
                     {formatFecha(getLeadDateRaw(lead))}
                   </td>
@@ -589,7 +592,11 @@ export default function LeadTable() {
       </div>
 
       {/* MODAL */}
-      <AssignUsers isOpen={showAssignUsers} onAssign={onAssignSelected} onClose={() => setShowAssignUsers(false)} />
+      <AssignUsers
+        isOpen={showAssignUsers}
+        onAssign={onAssignSelected}
+        onClose={() => setShowAssignUsers(false)}
+      />
     </div>
   );
 }
