@@ -8,7 +8,7 @@ export interface User {
   id: number;
   nombre: string;
 
-  // a veces correo / email según tu BD
+  // correo puede venir undefined, por eso opcional
   correo?: string;
   email?: string;
 
@@ -16,10 +16,12 @@ export interface User {
   cedula?: string;
   puede_ver_todo?: boolean;
 
-  // ✅ laboral
+  // extras que usa la tabla (vienen del backend)
+  estado_expediente?: "COMPLETO" | "INCOMPLETO";
+  faltantes?: string[];
+
   estado_laboral?: EstadoLaboral;
   motivo_salida?: string | null;
-  fecha_salida?: string | null;
 
   motivo_reingreso?: string | null;
   fecha_reingreso?: string | null;
@@ -27,51 +29,32 @@ export interface User {
   [key: string]: any;
 }
 
-function pickUsuarios(data: any): User[] {
-  // ✅ formato 1: { meta, rows }
-  if (Array.isArray(data?.rows)) return data.rows;
-
-  // ✅ formato 2: { usuarios: [...] }
-  if (Array.isArray(data?.usuarios)) return data.usuarios;
-
-  // ✅ formato 3: array directo
-  if (Array.isArray(data)) return data;
-
-  return [];
-}
-
 export function useUsuarios() {
   const [usuarios, setUsuarios] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
 
   // -------------------------------------------------
-  // CARGAR USUARIOS
+  // CARGAR USUARIOS (USA COOKIE TOKEN AUTOMÁTICAMENTE)
   // -------------------------------------------------
   const cargarUsuarios = useCallback(async () => {
     setLoading(true);
 
     try {
-      // ✅ USA el endpoint correcto (el que devuelve estado_laboral)
-      // Si tu endpoint bueno es /api/usuarios (como en tu screenshot), usa ese.
-      const res = await fetch("/api/usuarios", {
+      const res = await fetch("/api/usuarios/listar", {
         method: "GET",
         credentials: "include",
-        cache: "no-store",
       });
 
       const data = await res.json();
 
       if (!res.ok) {
-        console.error("Error cargando usuarios:", data?.error || data);
-        setUsuarios([]);
+        console.error("Error cargando usuarios:", data.error);
         return;
       }
 
-      const list = pickUsuarios(data);
-      setUsuarios(list);
+      setUsuarios(Array.isArray(data.usuarios) ? data.usuarios : []);
     } catch (err) {
       console.error("Error cargando usuarios:", err);
-      setUsuarios([]);
     } finally {
       setLoading(false);
     }
@@ -85,16 +68,18 @@ export function useUsuarios() {
       const res = await fetch("/api/usuarios/crear", {
         method: "POST",
         credentials: "include",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify(usuario),
       });
 
       const data = await res.json();
 
       if (res.ok && data.user) {
-        setUsuarios((prev) => [data.user, ...prev]);
+        setUsuarios((prev) => [...prev, data.user]);
       } else {
-        console.error("Error creando usuario:", data?.error || data);
+        console.error("Error creando usuario:", data.error);
       }
     } catch (err) {
       console.error("Error creando usuario:", err);
@@ -109,7 +94,9 @@ export function useUsuarios() {
       const res = await fetch(`/api/usuarios/editar/${usuario.id}`, {
         method: "PUT",
         credentials: "include",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify(usuario),
       });
 
@@ -120,7 +107,7 @@ export function useUsuarios() {
           prev.map((u) => (u.id === data.user.id ? data.user : u))
         );
       } else {
-        console.error("Error editando usuario:", data?.error || data);
+        console.error("Error editando usuario:", data.error);
       }
     } catch (err) {
       console.error("Error editando usuario:", err);
@@ -131,7 +118,7 @@ export function useUsuarios() {
   // Cargar al montar
   // -------------------------------------------------
   useEffect(() => {
-    cargarUsuarios();
+    void cargarUsuarios();
   }, [cargarUsuarios]);
 
   return { usuarios, loading, agregarUsuario, editarUsuario, cargarUsuarios };

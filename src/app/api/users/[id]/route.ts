@@ -44,6 +44,7 @@ export async function GET(req: NextRequest) {
         r.antecedentes_penales, r.antecedentes_penales_file,
         r.certificado_bancario, r.certificado_bancario_file,
         r.ruc, r.ruc_file,
+        r.acuerdo_privacidad, r.acuerdo_privacidad_file,
         r.certificado_discapacidad, r.certificado_discapacidad_file,
         r.partida_matrimonio, r.partida_matrimonio_file,
         r.partida_nacimiento_hijos, r.partida_nacimiento_hijos_file
@@ -78,6 +79,7 @@ export async function GET(req: NextRequest) {
       antecedentes_penales: row.antecedentes_penales_file ?? null,
       certificado_bancario: row.certificado_bancario_file ?? null,
       ruc: row.ruc_file ?? null,
+      acuerdo_privacidad: row.acuerdo_privacidad_file ?? null,
 
       certificado_discapacidad: row.certificado_discapacidad_file ?? null,
       partida_matrimonio: row.partida_matrimonio_file ?? null,
@@ -97,9 +99,12 @@ export async function GET(req: NextRequest) {
       "antecedentes_penales",
       "certificado_bancario",
       "ruc",
+      "acuerdo_privacidad",
     ] as const;
 
-    const estado_expediente = REQUIRED_KEYS.every(k => !!requisitos[k])
+    const estado_expediente = REQUIRED_KEYS.every(
+      (k) => !!requisitos[k]
+    )
       ? "COMPLETO"
       : "INCOMPLETO";
 
@@ -112,17 +117,21 @@ export async function GET(req: NextRequest) {
         cedula: row.cedula,
         rol: row.rol,
         estado_expediente,
+
+        // 🔥 AGREGO EL CAMPO QUE TE FALTABA
+        acuerdo_privacidad: row.acuerdo_privacidad,
         foto_asesor: row.foto_asesor,
         cedula_frontal: row.cedula_frontal,
         cedula_reverso: row.cedula_reverso,
-            linkedin_url: row.linkedin_url,
-    facebook_url: row.facebook_url,
-    instagram_url: row.instagram_url,
-    tiktok_url: row.tiktok_url,
-    x_url: row.x_url,
+        linkedin_url: row.linkedin_url,
+        facebook_url: row.facebook_url,
+        instagram_url: row.instagram_url,
+        tiktok_url: row.tiktok_url,
+        x_url: row.x_url,
       },
       requisitos,
     });
+
   } catch (e: any) {
     console.error(e);
     return NextResponse.json(
@@ -130,35 +139,72 @@ export async function GET(req: NextRequest) {
       { status: 500 }
     );
   }
-}
-
-
+} 
 // -----------------------------
-// PUT — Editar usuario
+// PUT — Editar usuario (CORREGIDO SIN ROMPER TU ESTRUCTURA)
 // -----------------------------
 export async function PUT(req: NextRequest) {
   try {
     const token = getToken(req);
     if (!token)
-      return NextResponse.json({ ok: false, error: "No autorizado" }, { status: 401 });
+      return NextResponse.json(
+        { ok: false, error: "No autorizado" },
+        { status: 401 }
+      );
 
-    verifyToken(token);
+    const decoded = verifyToken(token);
     const id = extractIdFromUrl(req);
     const body = await req.json();
+
+    // 🔒 Solo el mismo usuario o admin pueden editar
+    if (decoded.id !== id && !["admin", "administrador"].includes(decoded.rol)) {
+      return NextResponse.json(
+        { ok: false, error: "No autorizado" },
+        { status: 403 }
+      );
+    }
 
     const fields: string[] = [];
     const values: any[] = [];
     let idx = 1;
 
+    // 🔒 Campos permitidos (NO se puede modificar rol ni id)
+    const allowedFields = [
+      "nombre",
+      "correo",
+      "cedula",
+      "linkedin_url",
+      "facebook_url",
+      "instagram_url",
+      "tiktok_url",
+      "x_url",
+      "foto_asesor",
+      "cedula_frontal",
+      "cedula_reverso",
+      "password",
+    ];
+
     for (const key of Object.keys(body)) {
+      if (!allowedFields.includes(key)) continue;
+
       if (key === "password") {
         const hashed = await hashPassword(body.password);
-        fields.push(`password = $${idx++}`);
+        fields.push(`password = $${idx}`);
         values.push(hashed);
       } else {
-        fields.push(`${key} = $${idx++}`);
+        fields.push(`${key} = $${idx}`);
         values.push(body[key]);
       }
+
+      idx++;
+    }
+
+    // 🔥 Evita SQL inválido
+    if (fields.length === 0) {
+      return NextResponse.json(
+        { ok: false, error: "No hay campos válidos para actualizar" },
+        { status: 400 }
+      );
     }
 
     values.push(id);
@@ -168,7 +214,18 @@ export async function PUT(req: NextRequest) {
       values
     );
 
-    return NextResponse.json({ ok: true, user: result.rows[0] });
+    if (!result.rows.length) {
+      return NextResponse.json(
+        { ok: false, error: "Usuario no encontrado" },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({
+      ok: true,
+      user: result.rows[0],
+    });
+
   } catch (e: any) {
     console.error(e);
     return NextResponse.json(
@@ -177,7 +234,6 @@ export async function PUT(req: NextRequest) {
     );
   }
 }
-
 // -----------------------------
 // DELETE — Admin
 // -----------------------------

@@ -25,12 +25,13 @@ export default function UsuarioModal({ onClose, onSave, user }: UsuarioModalProp
   // Si recibimos user, precargamos datos para editar
   useEffect(() => {
     if (user) {
-      setForm((prev) => ({
-        ...prev,
+      setForm({
+        ...form,
         ...user,
-        password: user.password || prev.password || generarPassword(),
-      }));
+        password: user.password || generarPassword(),
+      });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   const handleChange = (key: string, value: any) => {
@@ -81,8 +82,7 @@ export default function UsuarioModal({ onClose, onSave, user }: UsuarioModalProp
         >
           <option value="asesor">Asesor</option>
           <option value="admin">Administrador</option>
-          <option value="rrhh">RRHH</option>
-          <option value="SpA">SpA</option>
+          <option value="admin">RRHH</option>
         </select>
 
         {/* Password */}

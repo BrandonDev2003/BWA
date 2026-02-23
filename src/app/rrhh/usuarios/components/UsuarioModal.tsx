@@ -1,15 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import { User, Mail, Lock, Unlock } from "lucide-react";
 
-interface UsuarioModalProps {
-     mode: "add" | "edit" | "view";
+export type ModalMode = "add" | "edit" | "view";
 
+interface UsuarioModalProps {
+  mode: ModalMode;
   user?: any;
   onClose: () => void;
-  onAddUser?: (user: any) => void;
-  onEditUser?: (user: any) => void;
+  onAddUser?: (user: any) => Promise<void> | void;
+  onEditUser?: (user: any) => Promise<void> | void;
 }
 
 export default function UsuarioModal({
@@ -19,6 +20,10 @@ export default function UsuarioModal({
   onAddUser,
   onEditUser,
 }: UsuarioModalProps) {
+  const isReadOnly = mode === "view";
+  const isEdit = mode === "edit";
+  const isAdd = mode === "add";
+
   // ---------------- ESTADOS ----------------
   const [nombre, setNombre] = useState(user?.nombre || "");
   const [correo, setCorreo] = useState(user?.correo || "");
@@ -29,30 +34,31 @@ export default function UsuarioModal({
   const [fotoAsesor, setFotoAsesor] = useState<File | null>(null);
   const [cedulaFrontal, setCedulaFrontal] = useState<File | null>(null);
   const [cedulaReverso, setCedulaReverso] = useState<File | null>(null);
-const isView = mode === "view";
-const isEdit = mode === "edit";
 
-const [locked, setLocked] = useState({
-  nombre: isEdit || isView,
-  correo: isEdit || isView,
-  cedula: isEdit || isView,
-  rol: isEdit || isView,
-  password: true, // siempre inicia bloqueada
-  fotoAsesor: isEdit || isView,
-  cedulaFrontal: isEdit || isView,
-  cedulaReverso: isEdit || isView,
-});
+  const [locked, setLocked] = useState({
+    nombre: !isAdd,
+    correo: !isAdd,
+    cedula: !isAdd,
+    rol: !isAdd,
+    password: !isAdd, // en edit/view bloqueada por defecto
+    fotoAsesor: !isAdd,
+    cedulaFrontal: !isAdd,
+    cedulaReverso: !isAdd,
+  });
 
   // ---------------- FUNCIONES ----------------
-  const toggleLock = (field: keyof typeof locked) =>
+  const toggleLock = (field: keyof typeof locked) => {
+    if (isReadOnly) return; // en view no se desbloquea
     setLocked((prev) => ({ ...prev, [field]: !prev[field] }));
+  };
 
   const generarPassword = () => {
     const chars =
       "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%";
     let pass = "";
-    for (let i = 0; i < 10; i++)
+    for (let i = 0; i < 10; i++) {
       pass += chars[Math.floor(Math.random() * chars.length)];
+    }
     setPassword(pass);
   };
 
@@ -63,7 +69,9 @@ const [locked, setLocked] = useState({
     };
 
   const handleSubmit = async () => {
-    if (!nombre || !correo || !cedula || !rol || (mode === "add" && !password)) {
+    if (isReadOnly) return;
+
+    if (!nombre || !correo || !cedula || !rol || (isAdd && !password)) {
       return alert("Completa todos los campos");
     }
 
@@ -76,17 +84,18 @@ const [locked, setLocked] = useState({
       });
 
     const userData: any = { nombre, correo, cedula, rol };
-    if ((mode === "add" || (mode === "edit" && password)) && password) {
+
+    if ((isAdd || (isEdit && password)) && password) {
       userData.password = password;
     }
+
     if (fotoAsesor) userData.foto_asesor = await toBase64(fotoAsesor);
     if (cedulaFrontal) userData.cedula_frontal = await toBase64(cedulaFrontal);
     if (cedulaReverso) userData.cedula_reverso = await toBase64(cedulaReverso);
 
     try {
-      if (mode === "add" && onAddUser) await onAddUser(userData);
-      if (mode === "edit" && onEditUser)
-        await onEditUser({ ...userData, id: user.id });
+      if (isAdd && onAddUser) await onAddUser(userData);
+      if (isEdit && onEditUser) await onEditUser({ ...userData, id: user?.id });
       onClose();
     } catch (err) {
       console.error(err);
@@ -94,7 +103,7 @@ const [locked, setLocked] = useState({
     }
   };
 
-  // ---------------- RENDER ----------------
+  // ---------------- RENDER HELPERS ----------------
   const renderInput = (
     label: string,
     value: string,
@@ -102,7 +111,6 @@ const [locked, setLocked] = useState({
     field: keyof typeof locked,
     type: string = "text",
     icon?: React.ReactNode
-
   ) => (
     <div className="flex items-center gap-2 bg-gray-800 rounded-lg p-2">
       {icon}
@@ -116,7 +124,7 @@ const [locked, setLocked] = useState({
         }`}
         disabled={locked[field]}
       />
-      {mode === "edit" && (
+      {(isEdit || isReadOnly) && (
         <button type="button" onClick={() => toggleLock(field)}>
           {locked[field] ? (
             <Lock className="w-5 h-5 text-gray-400" />
@@ -156,6 +164,7 @@ const [locked, setLocked] = useState({
         ) : (
           <span className="text-gray-400 text-center">{label}</span>
         )}
+
         <input
           type="file"
           accept="image/*"
@@ -164,8 +173,9 @@ const [locked, setLocked] = useState({
           className="hidden"
         />
       </label>
-      {mode === "edit" && (
-        <button onClick={() => toggleLock(field)}>
+
+      {(isEdit || isReadOnly) && (
+        <button type="button" onClick={() => toggleLock(field)}>
           {locked[field] ? (
             <Lock className="w-4 h-4 text-gray-400" />
           ) : (
@@ -180,7 +190,7 @@ const [locked, setLocked] = useState({
     <div className="fixed inset-0 flex items-center justify-center bg-black/70 backdrop-blur-sm z-50">
       <div className="bg-gray-900 border border-gray-800 rounded-xl p-8 w-full max-w-lg shadow-xl">
         <h2 className="text-xl font-semibold mb-6 text-center">
-          {mode === "add" ? "🆕 Nuevo Asesor" : `✏️ Editar Asesor`}
+          {isAdd ? "🆕 Nuevo Asesor" : isEdit ? "✏️ Editar Asesor" : "👁️ Ver Asesor"}
         </h2>
 
         <div className="space-y-4">
@@ -192,6 +202,7 @@ const [locked, setLocked] = useState({
             "text",
             <User className="w-5 h-5 text-gray-400" />
           )}
+
           {renderInput(
             "Correo",
             correo,
@@ -200,6 +211,7 @@ const [locked, setLocked] = useState({
             "email",
             <Mail className="w-5 h-5 text-gray-400" />
           )}
+
           {renderInput("Cédula", cedula, setCedula, "cedula")}
 
           <div className="flex items-center gap-2 bg-gray-800 rounded-lg p-2">
@@ -213,9 +225,12 @@ const [locked, setLocked] = useState({
             >
               <option value="asesor">Asesor</option>
               <option value="admin">Administrador</option>
+              <option value="rrhh">RRHH</option>
+              <option value="spa">SpA</option>
             </select>
-            {mode === "edit" && (
-              <button onClick={() => toggleLock("rol")}>
+
+            {(isEdit || isReadOnly) && (
+              <button type="button" onClick={() => toggleLock("rol")}>
                 {locked.rol ? (
                   <Lock className="w-5 h-5 text-gray-400" />
                 ) : (
@@ -226,7 +241,7 @@ const [locked, setLocked] = useState({
           </div>
 
           {/* Contraseña */}
-          {(mode === "add" || mode === "edit") && (
+          {!isReadOnly && (
             <div className="flex items-center gap-2 bg-gray-800 rounded-lg p-2">
               <input
                 type="text"
@@ -238,8 +253,13 @@ const [locked, setLocked] = useState({
                 }`}
                 disabled={locked.password}
               />
-              {mode === "edit" && (
-                <button type="button" onClick={() => toggleLock("password")}>
+
+              {isEdit && (
+                <button
+                  type="button"
+                  onClick={() => toggleLock("password")}
+                  title="Desbloquear"
+                >
                   {locked.password ? (
                     <Lock className="w-5 h-5 text-gray-400" />
                   ) : (
@@ -247,16 +267,20 @@ const [locked, setLocked] = useState({
                   )}
                 </button>
               )}
-              {!locked.password && (
+
+              {isAdd && (
                 <button
+                  type="button"
                   onClick={generarPassword}
                   className="text-sm bg-purple-600 hover:bg-purple-700 px-3 py-1 rounded-lg"
                 >
                   Generar
                 </button>
               )}
-              {mode === "add" && (
+
+              {isEdit && !locked.password && (
                 <button
+                  type="button"
                   onClick={generarPassword}
                   className="text-sm bg-purple-600 hover:bg-purple-700 px-3 py-1 rounded-lg"
                 >
@@ -293,17 +317,22 @@ const [locked, setLocked] = useState({
 
         <div className="flex justify-end gap-3 mt-6">
           <button
+            type="button"
             onClick={onClose}
             className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-full"
           >
-            Cancelar
+            {isReadOnly ? "Cerrar" : "Cancelar"}
           </button>
-          <button
-            onClick={handleSubmit}
-            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-full shadow"
-          >
-            {mode === "add" ? "Crear usuario" : "Guardar cambios"}
-          </button>
+
+          {!isReadOnly && (
+            <button
+              type="button"
+              onClick={handleSubmit}
+              className="px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-full shadow"
+            >
+              {isAdd ? "Crear usuario" : "Guardar cambios"}
+            </button>
+          )}
         </div>
       </div>
     </div>

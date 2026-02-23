@@ -58,6 +58,8 @@ export default function LoginPage() {
         router.replace("/Ventas/home");
       } else if (rol === "rrhh") {
         router.replace("/rrhh/home");
+      } else if (rol === "RRHH") {
+        router.replace("/rrhh/home");
       } else if (rol === "asesor") {
         router.replace("/Asesor/home");
       } else {

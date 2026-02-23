@@ -37,7 +37,7 @@ type Post = {
 };
 
 function isAdminRole(rol?: string | null) {
-  return rol === "SpA" || rol === "SPA" || rol === "spa";
+  return rol === "rrhh" || rol === "RRHH" || rol === "spa";
 }
 
 function UsersTooltip({ users }: { users?: string[] }) {

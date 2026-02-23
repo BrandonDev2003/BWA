@@ -19,6 +19,7 @@ interface Requisitos {
   antecedentes_penales: UrlOrNull;
   certificado_bancario: UrlOrNull;
   ruc: UrlOrNull;
+  acuerdo_privacidad: UrlOrNull;
   certificado_discapacidad: UrlOrNull;
   partida_matrimonio: UrlOrNull;
   partida_nacimiento_hijos: UrlOrNull;
@@ -676,6 +677,12 @@ export default function UsuarioDetallePage() {
                   />
                   <ReqItem label="RUC" field="ruc" value={requisitos.ruc} />
 
+                      {/* ✅ NUEVO */}
+                      <ReqItem
+                        label="Acuerdo de privacidad"
+                        field="acuerdo_privacidad"
+                        value={requisitos.acuerdo_privacidad}
+                      />
                   <ReqItem
                     label="Discapacidad"
                     field="certificado_discapacidad"

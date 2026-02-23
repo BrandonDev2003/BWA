@@ -3,32 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
-type EstadoLaboral = "ACTIVO" | "DESVINCULADO" | "RENUNCIA";
+import type { User, EstadoLaboral } from "./useUsuarios";
+
 type EstadoFiltro = EstadoLaboral | "TODOS";
-
-interface User {
-  id: number;
-  nombre: string;
-  correo?: string;
-  email?: string;
-  rol: string;
-  cedula?: string;
-
-  estado_expediente?: "COMPLETO" | "INCOMPLETO";
-  faltantes?: string[];
-
-  estado_laboral?: EstadoLaboral; // viene del backend
-  motivo_salida?: string | null;
-
-  motivo_reingreso?: string | null;
-  fecha_reingreso?: string | null;
-
-  [key: string]: any;
-}
 
 interface UsuariosTableProps {
   usuarios: User[];
-  onEdit?: (user: User) => void;
+  onEdit?: (user: User) => void; // <- void
 }
 
 export default function UsuariosTable({ usuarios, onEdit }: UsuariosTableProps) {
@@ -54,7 +35,8 @@ export default function UsuariosTable({ usuarios, onEdit }: UsuariosTableProps) 
 
   // modal salida
   const [salidaUser, setSalidaUser] = useState<User | null>(null);
-  const [salidaTipo, setSalidaTipo] = useState<Exclude<EstadoLaboral, "ACTIVO">>("DESVINCULADO");
+  const [salidaTipo, setSalidaTipo] =
+    useState<Exclude<EstadoLaboral, "ACTIVO">>("DESVINCULADO");
   const [salidaMotivo, setSalidaMotivo] = useState("");
   const [savingSalida, setSavingSalida] = useState(false);
 
@@ -274,10 +256,16 @@ export default function UsuariosTable({ usuarios, onEdit }: UsuariosTableProps) 
     const base =
       "inline-flex items-center justify-center text-xs font-semibold px-3 py-1 rounded-full border border-white/10";
     if (estado === "ACTIVO")
-      return <span className={`${base} bg-emerald-600/20 text-emerald-200`}>ACTIVO</span>;
+      return (
+        <span className={`${base} bg-emerald-600/20 text-emerald-200`}>ACTIVO</span>
+      );
     if (estado === "DESVINCULADO")
-      return <span className={`${base} bg-red-600/20 text-red-200`}>DESVINCULADO</span>;
-    return <span className={`${base} bg-yellow-500/20 text-yellow-200`}>RENUNCIA</span>;
+      return (
+        <span className={`${base} bg-red-600/20 text-red-200`}>DESVINCULADO</span>
+      );
+    return (
+      <span className={`${base} bg-yellow-500/20 text-yellow-200`}>RENUNCIA</span>
+    );
   };
 
   const pageButtons = useMemo(() => {

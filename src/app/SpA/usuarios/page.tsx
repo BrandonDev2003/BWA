@@ -8,7 +8,8 @@ import { Menu, PlusCircle } from "lucide-react";
 import Sidebar from "../usuarios/components/Sidebar";
 import UsuariosTable from "../usuarios/components/UsuariosTable";
 import UsuarioModal from "../usuarios/components/UsuarioModal";
-import { useUsuarios, User } from "../usuarios/components/useUsuarios";
+import { useUsuarios } from "../usuarios/components/useUsuarios";
+import type { User } from "../usuarios/components/useUsuarios";
 
 export default function UsuariosPage() {
   const router = useRouter();
@@ -70,7 +71,7 @@ export default function UsuariosPage() {
       }
     };
 
-    verifyUser();
+    void verifyUser();
   }, []);
 
   // --- Redirección ---
@@ -250,7 +251,10 @@ export default function UsuariosPage() {
                   No hay asesores que coincidan con los filtros.
                 </p>
               ) : (
-                <UsuariosTable usuarios={usuariosFiltrados} onEdit={handleEditUser} />
+                <UsuariosTable
+                  usuarios={usuariosFiltrados}
+                  onEdit={(u) => void handleEditUser(u)} // ✅ FIX
+                />
               )}
             </motion.div>
           </main>

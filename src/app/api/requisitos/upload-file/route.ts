@@ -18,6 +18,10 @@ const ALLOWED_FIELDS = [
   "antecedentes_penales",
   "certificado_bancario",
   "ruc",
+
+  // ✅ SOLO ESTO SE AGREGÓ
+  "acuerdo_privacidad",
+
   "certificado_discapacidad",
   "partida_matrimonio",
   "partida_nacimiento_hijos",
@@ -67,7 +71,6 @@ export async function POST(req: NextRequest) {
 
     const field = fieldRaw as AllowedField;
 
-    // Validaciones básicas
     if (file.size > MAX_BYTES) {
       return NextResponse.json(
         { ok: false, error: "Archivo demasiado grande (máx 10MB)" },
@@ -82,21 +85,18 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Convertir a buffer
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    // Subir a Cloudinary
     const resourceType = mimeToResourceType(file.type);
 
     const uploadResult = await new Promise<any>((resolve, reject) => {
       const stream = cloudinary.uploader.upload_stream(
         {
           folder: `requisitos/${userId}`,
-          resource_type: resourceType, // image o raw
-          // nombre "bonito" sin necesidad de uuid aquí (Cloudinary lo maneja)
+          resource_type: resourceType,
           public_id: `${field}-${Date.now()}`,
-          overwrite: true, // si sube de nuevo el mismo campo, reemplaza
+          overwrite: true,
         },
         (error, result) => {
           if (error) reject(error);
@@ -109,7 +109,6 @@ export async function POST(req: NextRequest) {
 
     const url: string = uploadResult.secure_url;
 
-    // Asegurar fila
     await pool.query(
       `
       INSERT INTO requisitos_usuario (user_id)
@@ -119,7 +118,6 @@ export async function POST(req: NextRequest) {
       [userId]
     );
 
-    // ⚠️ OJO: el nombre de columna viene de lista blanca, es seguro interpolar
     const result = await pool.query(
       `
       UPDATE requisitos_usuario

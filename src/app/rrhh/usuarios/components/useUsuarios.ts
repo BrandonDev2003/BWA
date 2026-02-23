@@ -2,13 +2,30 @@
 
 import { useState, useEffect, useCallback } from "react";
 
+export type EstadoLaboral = "ACTIVO" | "DESVINCULADO" | "RENUNCIA";
+
 export interface User {
   id: number;
   nombre: string;
-  correo: string;
+
+  // correo puede venir undefined, por eso opcional
+  correo?: string;
+  email?: string;
+
   rol: string;
   cedula?: string;
   puede_ver_todo?: boolean;
+
+  // extras que usa la tabla (vienen del backend)
+  estado_expediente?: "COMPLETO" | "INCOMPLETO";
+  faltantes?: string[];
+
+  estado_laboral?: EstadoLaboral;
+  motivo_salida?: string | null;
+
+  motivo_reingreso?: string | null;
+  fecha_reingreso?: string | null;
+
   [key: string]: any;
 }
 
@@ -101,7 +118,7 @@ export function useUsuarios() {
   // Cargar al montar
   // -------------------------------------------------
   useEffect(() => {
-    cargarUsuarios();
+    void cargarUsuarios();
   }, [cargarUsuarios]);
 
   return { usuarios, loading, agregarUsuario, editarUsuario, cargarUsuarios };
