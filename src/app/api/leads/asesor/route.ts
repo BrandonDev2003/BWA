@@ -15,6 +15,20 @@ function getUserFromToken(token: string) {
   return JSON.parse(decodedJson);
 }
 
+// ✅ HOY en YYYY-MM-DD (local, sin UTC)
+function todayYMD() {
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+// ✅ valida YYYY-MM-DD
+function isYMD(s: any) {
+  return typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s);
+}
+
 export async function GET(req: Request) {
   try {
     const token = getTokenFromCookie(req);
@@ -75,6 +89,9 @@ export async function POST(req: Request) {
       );
     }
 
+    // ✅ fecha: si viene bien, úsala; si no, hoy
+    const fecha = isYMD(body?.fecha) ? body.fecha : todayYMD();
+
     // Opcionales
     const apellido = (body?.apellido || "").toString().trim() || null;
     const correo = (body?.correo || "").toString().trim() || null;
@@ -105,21 +122,22 @@ export async function POST(req: Request) {
 
     const insert = await pool.query(
       `
-      INSERT INTO leads (
-        asignado_a,
-        origen,
-        nombre,
-        apellido,
-        telefono,
-        correo,
-        estado,
-        codigo_pais,
-        pais,
-        meses_inversion,
-        monto_inversion
-      )
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
-      RETURNING *
+        INSERT INTO leads (
+          asignado_a,
+          origen,
+          nombre,
+          apellido,
+          telefono,
+          correo,
+          estado,
+          codigo_pais,
+          pais,
+          meses_inversion,
+          monto_inversion,
+          fecha
+        )
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+        RETURNING *
       `,
       [
         asignado_a,
@@ -133,6 +151,7 @@ export async function POST(req: Request) {
         pais,
         meses_inversion,
         monto_inversion,
+        fecha, // ✅ AQUÍ SE GUARDA
       ]
     );
 

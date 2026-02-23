@@ -40,7 +40,10 @@ function fmtDate(d?: string | null) {
 
 export default function VentasPage() {
   const router = useRouter();
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  // ✅ SIDEBAR STATE (NUEVO)
+  const [open, setOpen] = useState(true);
+
   const [auth, setAuth] = useState<"loading" | "ok" | "no">("loading");
   const [user, setUser] = useState<User | null>(null);
 
@@ -49,7 +52,9 @@ export default function VentasPage() {
 
   // Modal cambiar estado
   const [editing, setEditing] = useState<Venta | null>(null);
-  const [nuevoEstado, setNuevoEstado] = useState<"pendiente" | "aprobada" | "rechazada">("pendiente");
+  const [nuevoEstado, setNuevoEstado] = useState<
+    "pendiente" | "aprobada" | "rechazada"
+  >("pendiente");
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
 
@@ -58,7 +63,10 @@ export default function VentasPage() {
     return rol === "admin" || rol === "spa";
   }, [user]);
 
-  const isAsesor = useMemo(() => (user?.rol || "").toLowerCase() === "asesor", [user]);
+  const isAsesor = useMemo(
+    () => (user?.rol || "").toLowerCase() === "asesor",
+    [user]
+  );
 
   // auth
   useEffect(() => {
@@ -146,7 +154,8 @@ export default function VentasPage() {
       </div>
 
       <div className="relative flex min-h-screen">
-        <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} />
+        {/* ✅ PASAMOS PROPS AL SIDEBAR (ARREGLA EL ERROR) */}
+        <Sidebar open={open} setOpen={setOpen} />
 
         <div className="flex-1 p-6 md:p-8">
           <div className="mb-6 flex items-end justify-between gap-4">
@@ -161,10 +170,14 @@ export default function VentasPage() {
 
             <div className="text-right text-sm text-white/60">
               <div>
-                Rol: <span className="text-white/85 font-semibold">{user?.rol}</span>
+                Rol:{" "}
+                <span className="text-white/85 font-semibold">{user?.rol}</span>
               </div>
               <div>
-                Total: <span className="text-white/85 font-semibold">{ventas.length}</span>
+                Total:{" "}
+                <span className="text-white/85 font-semibold">
+                  {ventas.length}
+                </span>
               </div>
             </div>
           </div>
@@ -196,7 +209,10 @@ export default function VentasPage() {
 
                   <tbody>
                     {ventas.map((v) => (
-                      <tr key={v.id} className="border-b border-white/10 hover:bg-white/5">
+                      <tr
+                        key={v.id}
+                        className="border-b border-white/10 hover:bg-white/5"
+                      >
                         <td className="p-4 text-white/80 font-semibold">#{v.id}</td>
 
                         <td className="p-4">
@@ -213,13 +229,18 @@ export default function VentasPage() {
                         </td>
 
                         <td className="p-4 text-white/80">
-                          {v.tipo_producto} · {v.meses}m · ${String(v.monto)} · {String(v.interes)}%
+                          {v.tipo_producto} · {v.meses}m · ${String(v.monto)} ·{" "}
+                          {String(v.interes)}%
                         </td>
 
                         <td className="p-4 text-white/70">{fmtDate(v.fecha_venta)}</td>
 
                         <td className="p-4 text-white/70">
-                          {v.nombre_asesor ? v.nombre_asesor : v.asignado_a ? `Usuario #${v.asignado_a}` : "—"}
+                          {v.nombre_asesor
+                            ? v.nombre_asesor
+                            : v.asignado_a
+                            ? `Usuario #${v.asignado_a}`
+                            : "—"}
                         </td>
 
                         <td className="p-4">
@@ -238,20 +259,29 @@ export default function VentasPage() {
                         </td>
 
                         <td className="p-4 text-right">
-                          {canEdit ? (
+                          <div className="inline-flex items-center gap-2">
                             <button
-                              onClick={() => {
-                                setErr("");
-                                setEditing(v);
-                                setNuevoEstado(v.estado_revision ?? "pendiente");
-                              }}
-                              className="px-3 py-2 rounded-full bg-sky-500/20 border border-sky-400/20 text-white font-semibold hover:bg-sky-500/30 transition"
+                              onClick={() => router.push(`/Ventas/${v.id}`)}
+                              className="px-3 py-2 rounded-full bg-white/5 border border-white/10 text-white font-semibold hover:bg-white/10 transition"
                             >
-                              Cambiar estado
+                              Inspeccionar
                             </button>
-                          ) : (
-                            <span className="text-white/35">Solo lectura</span>
-                          )}
+
+                            {canEdit ? (
+                              <button
+                                onClick={() => {
+                                  setErr("");
+                                  setEditing(v);
+                                  setNuevoEstado(v.estado_revision ?? "pendiente");
+                                }}
+                                className="px-3 py-2 rounded-full bg-sky-500/20 border border-sky-400/20 text-white font-semibold hover:bg-sky-500/30 transition"
+                              >
+                                Cambiar estado
+                              </button>
+                            ) : (
+                              <span className="text-white/35">Solo lectura</span>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -267,7 +297,9 @@ export default function VentasPage() {
               <div className="w-full max-w-lg rounded-3xl border border-white/10 bg-[#0B0D10] shadow-2xl overflow-hidden">
                 <div className="p-5 border-b border-white/10 bg-black/25 flex items-center justify-between">
                   <div>
-                    <div className="text-white font-semibold text-lg">Revisión venta #{editing.id}</div>
+                    <div className="text-white font-semibold text-lg">
+                      Revisión venta #{editing.id}
+                    </div>
                     <div className="text-white/50 text-sm">{editing.nombre}</div>
                   </div>
 
@@ -281,7 +313,9 @@ export default function VentasPage() {
 
                 <div className="p-5 space-y-4">
                   <div>
-                    <label className="block text-white/70 text-xs mb-2">Estado de revisión</label>
+                    <label className="block text-white/70 text-xs mb-2">
+                      Estado de revisión
+                    </label>
                     <select
                       value={nuevoEstado}
                       onChange={(e) => setNuevoEstado(e.target.value as any)}
