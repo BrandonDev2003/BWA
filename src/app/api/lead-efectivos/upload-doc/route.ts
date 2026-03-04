@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { cloudinary } from "@/lib/cloudinary";
+import cloudinary from "@/lib/cloudinary";
 import { getSessionUser } from "@/lib/session";
 
 export const runtime = "nodejs";

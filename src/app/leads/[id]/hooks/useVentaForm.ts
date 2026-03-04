@@ -5,11 +5,17 @@ import type { Lead, TipoProducto } from "../types";
 import { getReglasProducto } from "../utils/productRules";
 import { toDatetimeLocalValue } from "../utils/date";
 
+// ✅ Tipo base de documento (Cloudinary)
 export type DocData = {
   url: string;
   public_id: string;
-  resource_type?: string;
+  resource_type?: "image" | "raw"; // ✅ tipado correcto
   original_filename?: string;
+};
+
+// ✅ Alias compatible con DocUploader (lo que estaba faltando)
+export type DocFile = DocData & {
+  resource_type: "image" | "raw"; // ✅ requerido para tu componente
 };
 
 export type VentaDocs = {
@@ -134,7 +140,11 @@ export function useVentaForm() {
       monto: montoNum,
       interes: reglas.interesFijo ? reglas.interesMax : interesNum,
 
-      fecha_lead: lead.fecha ? new Date(lead.fecha).toISOString().slice(0, 10) : null,
+      // ⚠️ OJO: tu API exige string YYYY-MM-DD.
+      // Aquí estabas mandando null si no hay fecha (eso puede romper).
+      // Si lead.fecha puede venir vacío, mejor valida antes o manda "".
+      fecha_lead: lead.fecha ? new Date(lead.fecha).toISOString().slice(0, 10) : "",
+
       fecha_venta: new Date(fechaVenta).toISOString(),
 
       // ✅ docs url/public_id

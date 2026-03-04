@@ -1,203 +1,229 @@
 "use client";
 
-import { useRef, useState } from "react";
-import type { DocFile } from "../hooks/useVentaForm";
+import { useEffect, useMemo, useState } from "react";
+import type { Lead, TipoProducto } from "../types";
+import { getReglasProducto } from "../utils/productRules";
+import { toDatetimeLocalValue } from "../utils/date";
 
-export function DocUploader({
-  label,
-  value,
-  onChange,
-  folder,
-  autoDeletePrevious = false,
-}: {
-  label: string;
-  value: DocFile | null;
-  onChange: (next: DocFile | null) => void;
-  folder: string; // ej: crm/leads/123/cedula
-  autoDeletePrevious?: boolean; // si quieres borrar anterior automáticamente al reemplazar
-}) {
-  const inputRef = useRef<HTMLInputElement | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState("");
+// ✅ Tipo base de documento (Cloudinary)
+export type DocData = {
+  url: string;
+  public_id: string;
+  resource_type?: "image" | "raw";
+  original_filename?: string;
+};
 
-  async function deleteFromCloudinary(file: DocFile) {
-    await fetch("/api/cloudinary/delete", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ public_id: file.public_id, resource_type: file.resource_type }),
+// ✅ Alias compatible con DocUploader (lo que estaba faltando)
+export type DocFile = DocData & {
+  resource_type: "image" | "raw";
+};
+
+export type VentaDocs = {
+  doc_cedula: DocData | null;
+  doc_licencia: DocData | null;
+  doc_servicio_basico: DocData | null;
+  doc_certificado_bancario: DocData | null;
+  doc_comprobante_fondeo: DocData | null;
+  doc_solicitud_firmada: DocData | null;
+  doc_cotizacion_inversion: DocData | null;
+};
+
+export const emptyDocs: VentaDocs = {
+  doc_cedula: null,
+  doc_licencia: null,
+  doc_servicio_basico: null,
+  doc_certificado_bancario: null,
+  doc_comprobante_fondeo: null,
+  doc_solicitud_firmada: null,
+  doc_cotizacion_inversion: null,
+};
+
+function allDocsOk(d: VentaDocs) {
+  return (
+    !!d.doc_cedula &&
+    !!d.doc_licencia &&
+    !!d.doc_servicio_basico &&
+    !!d.doc_certificado_bancario &&
+    !!d.doc_comprobante_fondeo &&
+    !!d.doc_solicitud_firmada &&
+    !!d.doc_cotizacion_inversion
+  );
+}
+
+export function useVentaForm() {
+  const [ventaOpen, setVentaOpen] = useState(false);
+
+  // ✅ docs (cloudinary url/public_id)
+  const [docs, setDocs] = useState<VentaDocs>(emptyDocs);
+
+  const [tipoProducto, setTipoProducto] = useState<TipoProducto>("plazo_fijo");
+  const reglas = useMemo(() => getReglasProducto(tipoProducto), [tipoProducto]);
+
+  const [meses, setMeses] = useState<number>(12);
+  const [monto, setMonto] = useState<number>(2000);
+  const [interes, setInteres] = useState<number>(1);
+  const [telefonoExtra, setTelefonoExtra] = useState<string>("");
+
+  const [fechaVenta, setFechaVenta] = useState<string>(() =>
+    toDatetimeLocalValue(new Date())
+  );
+
+  const [savingVenta, setSavingVenta] = useState(false);
+  const [ventaError, setVentaError] = useState<string>("");
+
+  useEffect(() => {
+    setVentaError("");
+    setMeses(reglas.mesesOptions[0]);
+
+    setMonto((prev) => {
+      const next = Number.isFinite(prev) ? prev : reglas.minMonto;
+      return next < reglas.minMonto ? reglas.minMonto : next;
     });
-  }
 
-  async function uploadFile(file: File) {
-    setErr("");
-    setBusy(true);
+    if (reglas.interesFijo) setInteres(reglas.interesMax);
+    else {
+      setInteres((prev) => {
+        const next = Number.isFinite(prev) ? prev : reglas.interesMin;
+        if (next < reglas.interesMin) return reglas.interesMin;
+        if (next > reglas.interesMax) return reglas.interesMax;
+        return next;
+      });
+    }
+  }, [reglas]);
+
+  async function submitVenta(lead: Lead, leadFullName: string) {
+    setVentaError("");
+
+    // ✅ Bloqueo docs
+    if (!allDocsOk(docs)) {
+      setVentaError("Debes subir todos los documentos antes de enviar la solicitud.");
+      return false;
+    }
+
+    const montoNum = Number(monto);
+    const interesNum = Number(interes);
+
+    if (!Number.isFinite(montoNum) || montoNum < reglas.minMonto) {
+      setVentaError(`El monto mínimo para este producto es ${reglas.minMonto}.`);
+      return false;
+    }
+
+    if (!fechaVenta) {
+      setVentaError("Selecciona la fecha de venta.");
+      return false;
+    }
+
+    if (!reglas.interesFijo) {
+      if (
+        !Number.isFinite(interesNum) ||
+        interesNum < reglas.interesMin ||
+        interesNum > reglas.interesMax
+      ) {
+        setVentaError(
+          `El interés debe estar entre ${reglas.interesMin}% y ${reglas.interesMax}%.`
+        );
+        return false;
+      }
+    }
+
+    const payload = {
+      lead_id: lead.id,
+      nombre: leadFullName,
+      correo: lead.correo,
+      telefono: `${lead.codigo_pais || ""} ${lead.telefono || ""}`.trim(),
+      telefono_extra: telefonoExtra?.trim() || null,
+      pais: lead.pais || null,
+      asignado_a: lead.asignado_a ?? null,
+
+      tipo_producto: tipoProducto,
+      meses,
+      monto: montoNum,
+      interes: reglas.interesFijo ? reglas.interesMax : interesNum,
+
+      // API espera YYYY-MM-DD; evita null
+      fecha_lead: lead.fecha ? new Date(lead.fecha).toISOString().slice(0, 10) : "",
+      fecha_venta: new Date(fechaVenta).toISOString(),
+
+      // ✅ docs url/public_id
+      doc_cedula_url: docs.doc_cedula!.url,
+      doc_cedula_public_id: docs.doc_cedula!.public_id,
+
+      doc_licencia_url: docs.doc_licencia!.url,
+      doc_licencia_public_id: docs.doc_licencia!.public_id,
+
+      doc_servicio_basico_url: docs.doc_servicio_basico!.url,
+      doc_servicio_basico_public_id: docs.doc_servicio_basico!.public_id,
+
+      doc_certificado_bancario_url: docs.doc_certificado_bancario!.url,
+      doc_certificado_bancario_public_id: docs.doc_certificado_bancario!.public_id,
+
+      doc_comprobante_fondeo_url: docs.doc_comprobante_fondeo!.url,
+      doc_comprobante_fondeo_public_id: docs.doc_comprobante_fondeo!.public_id,
+
+      doc_solicitud_firmada_url: docs.doc_solicitud_firmada!.url,
+      doc_solicitud_firmada_public_id: docs.doc_solicitud_firmada!.public_id,
+
+      doc_cotizacion_inversion_url: docs.doc_cotizacion_inversion!.url,
+      doc_cotizacion_inversion_public_id: docs.doc_cotizacion_inversion!.public_id,
+    };
 
     try {
-      // 1) pedir firma
-      const signRes = await fetch("/api/cloudinary/sign", {
+      setSavingVenta(true);
+
+      const res = await fetch("/api/lead-efectivos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ folder }),
+        body: JSON.stringify(payload),
       });
 
-      const sign = await signRes.json();
-      if (!signRes.ok) throw new Error(sign?.error || "No se pudo firmar");
+      const data = await res.json().catch(() => null);
 
-      // 2) decidir resource_type
-      const isPdf = file.type === "application/pdf";
-      const resource_type: "image" | "raw" = isPdf ? "raw" : "image";
-
-      const uploadUrl = `https://api.cloudinary.com/v1_1/${sign.cloudName}/${resource_type}/upload`;
-
-      const form = new FormData();
-      form.append("file", file);
-      form.append("api_key", sign.apiKey);
-      form.append("timestamp", String(sign.timestamp));
-      form.append("signature", sign.signature);
-      form.append("folder", sign.folder);
-
-      const upRes = await fetch(uploadUrl, { method: "POST", body: form });
-      const data = await upRes.json();
-      if (!upRes.ok) throw new Error(data?.error?.message || "Error subiendo archivo");
-
-      const next: DocFile = {
-        url: data.secure_url,
-        public_id: data.public_id,
-        resource_type,
-        original_filename: data.original_filename,
-      };
-
-      // opcional: borrar anterior al reemplazar
-      if (autoDeletePrevious && value?.public_id) {
-        try {
-          await deleteFromCloudinary(value);
-        } catch {}
+      if (!res.ok) {
+        setVentaError(data?.message || "No se pudo guardar la venta.");
+        return false;
       }
 
-      onChange(next);
-    } catch (e: any) {
-      setErr(e?.message || "Error subiendo archivo");
+      setVentaOpen(false);
+      setVentaError("");
+      return true;
+    } catch (e) {
+      console.error(e);
+      setVentaError("Error inesperado guardando la venta.");
+      return false;
     } finally {
-      setBusy(false);
-      if (inputRef.current) inputRef.current.value = "";
+      setSavingVenta(false);
     }
   }
 
-  async function handleDelete() {
-    if (!value?.public_id) return;
-    setErr("");
-    setBusy(true);
+  return {
+    ventaOpen,
+    setVentaOpen,
 
-    try {
-      const delRes = await fetch("/api/cloudinary/delete", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ public_id: value.public_id, resource_type: value.resource_type }),
-      });
+    docs,
+    setDocs,
 
-      const del = await delRes.json();
-      if (!delRes.ok) throw new Error(del?.error || "No se pudo borrar");
+    tipoProducto,
+    setTipoProducto,
+    reglas,
 
-      onChange(null);
-    } catch (e: any) {
-      setErr(e?.message || "Error borrando");
-    } finally {
-      setBusy(false);
-    }
-  }
+    meses,
+    setMeses,
+    monto,
+    setMonto,
+    interes,
+    setInteres,
 
-  const ok = !!value;
+    telefonoExtra,
+    setTelefonoExtra,
 
-  return (
-    <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-white font-semibold">{label}</p>
-          <p className="text-xs text-white/50">Sube imagen o PDF.</p>
-        </div>
+    fechaVenta,
+    setFechaVenta,
 
-        <span
-          className={[
-            "text-xs font-semibold px-3 py-1 rounded-full border",
-            ok
-              ? "bg-emerald-500/15 text-emerald-200 border-emerald-400/20"
-              : "bg-yellow-500/15 text-yellow-200 border-yellow-400/20",
-          ].join(" ")}
-        >
-          {ok ? "Listo" : "Pendiente"}
-        </span>
-      </div>
+    savingVenta,
+    ventaError,
+    setVentaError,
 
-      {value ? (
-        <div className="mt-3">
-          {value.resource_type === "image" ? (
-            <img
-              src={value.url}
-              alt={label}
-              className="w-full rounded-xl border border-white/10 max-h-64 object-cover"
-            />
-          ) : (
-            <div className="rounded-xl border border-white/10 bg-white/5 p-3 text-white/80 text-sm">
-              PDF: {value.original_filename || "archivo"}
-            </div>
-          )}
-
-          <div className="mt-3 flex flex-wrap gap-2">
-            <a
-              href={value.url}
-              target="_blank"
-              rel="noreferrer"
-              className="px-4 py-2 rounded-xl border border-white/10 text-white/85 hover:bg-white/5 text-sm"
-            >
-              Ver / Descargar
-            </a>
-
-            <button
-              onClick={handleDelete}
-              disabled={busy}
-              className="px-4 py-2 rounded-xl border border-red-500/20 bg-red-500/10 text-red-200 hover:bg-red-500/15 text-sm disabled:opacity-60"
-            >
-              {busy ? "..." : "Borrar"}
-            </button>
-
-            <button
-              onClick={() => inputRef.current?.click()}
-              disabled={busy}
-              className="ml-auto px-4 py-2 rounded-xl border border-white/10 text-white/85 hover:bg-white/5 text-sm disabled:opacity-60"
-            >
-              {busy ? "Subiendo..." : "Reemplazar"}
-            </button>
-          </div>
-        </div>
-      ) : (
-        <button
-          onClick={() => inputRef.current?.click()}
-          disabled={busy}
-          className="mt-3 w-full px-4 py-3 rounded-xl border border-white/10 bg-white/5 text-white/85 hover:bg-white/10 text-sm disabled:opacity-60"
-        >
-          {busy ? "Subiendo..." : "Subir archivo"}
-        </button>
-      )}
-
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/*,application/pdf"
-        className="hidden"
-        onChange={(e) => {
-          const f = e.target.files?.[0];
-          if (f) uploadFile(f);
-        }}
-      />
-
-      {err && (
-        <div className="mt-3 rounded-xl border border-red-500/20 bg-red-500/10 p-2 text-red-200 text-xs">
-          {err}
-        </div>
-      )}
-    </div>
-  );
+    submitVenta,
+  };
 }

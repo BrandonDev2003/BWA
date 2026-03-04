@@ -1,7 +1,7 @@
 // src/app/api/lead-efectivos/delete-doc/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/session";
-import { cloudinary } from "@/lib/cloudinary";
+import cloudinary from "@/lib/cloudinary";
 
 function jsonError(message: string, status = 400, detail?: any) {
   return NextResponse.json({ ok: false, message, detail }, { status });

@@ -161,13 +161,17 @@ export async function POST(req: NextRequest) {
     return jsonError("fecha_lead es requerida (YYYY-MM-DD).", 400);
 
   const fechaVenta = body.fecha_venta ? new Date(body.fecha_venta) : new Date();
-  if (Number.isNaN(fechaVenta.getTime())) return jsonError("fecha_venta inválida.", 400);
+  if (Number.isNaN(fechaVenta.getTime()))
+    return jsonError("fecha_venta inválida.", 400);
 
   // ✅ reglas interés
   const interesNum = Number(body.interes);
   if (body.tipo_producto === "plazo_fijo") {
     if (interesNum < 1 || interesNum > 3.5) {
-      return jsonError("El interés para plazo fijo debe estar entre 1% y 3.5%.", 400);
+      return jsonError(
+        "El interés para plazo fijo debe estar entre 1% y 3.5%.",
+        400
+      );
     }
   } else {
     // profuturo: fijo 3
@@ -180,11 +184,31 @@ export async function POST(req: NextRequest) {
   const docErrors = [
     requireDoc(body.doc_cedula_url, body.doc_cedula_public_id, "Documento cédula"),
     requireDoc(body.doc_licencia_url, body.doc_licencia_public_id, "Documento licencia"),
-    requireDoc(body.doc_servicio_basico_url, body.doc_servicio_basico_public_id, "Documento servicio básico"),
-    requireDoc(body.doc_certificado_bancario_url, body.doc_certificado_bancario_public_id, "Documento certificado bancario"),
-    requireDoc(body.doc_comprobante_fondeo_url, body.doc_comprobante_fondeo_public_id, "Documento comprobante de fondeo"),
-    requireDoc(body.doc_solicitud_firmada_url, body.doc_solicitud_firmada_public_id, "Documento solicitud firmada"),
-    requireDoc(body.doc_cotizacion_inversion_url, body.doc_cotizacion_inversion_public_id, "Documento cotización inversión"),
+    requireDoc(
+      body.doc_servicio_basico_url,
+      body.doc_servicio_basico_public_id,
+      "Documento servicio básico"
+    ),
+    requireDoc(
+      body.doc_certificado_bancario_url,
+      body.doc_certificado_bancario_public_id,
+      "Documento certificado bancario"
+    ),
+    requireDoc(
+      body.doc_comprobante_fondeo_url,
+      body.doc_comprobante_fondeo_public_id,
+      "Documento comprobante de fondeo"
+    ),
+    requireDoc(
+      body.doc_solicitud_firmada_url,
+      body.doc_solicitud_firmada_public_id,
+      "Documento solicitud firmada"
+    ),
+    requireDoc(
+      body.doc_cotizacion_inversion_url,
+      body.doc_cotizacion_inversion_public_id,
+      "Documento cotización inversión"
+    ),
   ].filter(Boolean) as string[];
 
   if (docErrors.length) {
@@ -201,7 +225,8 @@ export async function POST(req: NextRequest) {
       [Number(body.lead_id)]
     );
 
-    if (exists.rowCount > 0) {
+    // ✅ FIX: rowCount puede ser null en tipos de pg → usa rows.length
+    if (exists.rows.length > 0) {
       await client.query("ROLLBACK");
       return jsonError("Esta solicitud ya fue enviada para este lead.", 409, {
         venta_id: exists.rows[0]?.id,
