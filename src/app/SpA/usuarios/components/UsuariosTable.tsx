@@ -25,7 +25,9 @@ export default function UsuariosTable({ usuarios, onEdit }: UsuariosTableProps) 
   const [mailing, setMailing] = useState(false);
   const [confirmUser, setConfirmUser] = useState<User | null>(null);
   const [otp, setOtp] = useState("");
-
+  // QR OTP
+  const [qrUser, setQrUser] = useState<User | null>(null);
+  const [qrImage, setQrImage] = useState("");
   // filtros
   const [estadoFiltro, setEstadoFiltro] = useState<EstadoFiltro>("TODOS");
   const [q, setQ] = useState("");
@@ -50,8 +52,38 @@ export default function UsuariosTable({ usuarios, onEdit }: UsuariosTableProps) 
   const getCorreo = (u: User) => (u.correo ?? u.email ?? "").toString();
   const getEstado = (u: User): EstadoLaboral =>
     (u.estado_laboral ?? "ACTIVO") as EstadoLaboral;
+  const generarQR = async (user: User) => {
+      try {
 
+        const res = await fetch("/api/auth/generate-otp-qr", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include",
+          body: JSON.stringify({
+            userId: user.id,
+            correo: getCorreo(user),
+          }),
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          alert(data.error || "Error generando QR");
+          return;
+        }
+
+        setQrUser(user);
+        setQrImage(data.qr);
+
+      } catch (err) {
+        console.error(err);
+        alert("Error generando QR");
+      }
+    };
   const enviarOTP = async (user: User) => {
+    
     try {
       setMailing(true);
 
@@ -448,6 +480,12 @@ export default function UsuariosTable({ usuarios, onEdit }: UsuariosTableProps) 
                       >
                         {mailing ? "Enviando..." : "Borrar"}
                       </button>
+                      <button
+                          onClick={() => generarQR(u)}
+                          className="bg-indigo-600/90 hover:bg-indigo-600 text-white px-3 py-1 rounded-md text-xs border border-white/10"
+                        >
+                          QR OTP
+                        </button>
                     </div>
                   </td>
                 </tr>
@@ -644,6 +682,38 @@ export default function UsuariosTable({ usuarios, onEdit }: UsuariosTableProps) 
           </div>
         </div>
       )}
+      {/* MODAL QR OTP */}
+      {qrUser && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-white/10 backdrop-blur-md p-6 shadow-2xl text-center text-white">
+
+            <h2 className="text-lg font-bold mb-3">
+              QR de autenticación
+            </h2>
+
+            <p className="text-sm mb-4 text-white/80">
+              Escanea con Google Authenticator
+            </p>
+
+            {qrImage && (
+              <img src={qrImage} className="w-56 mx-auto"/>
+            )}
+
+            <button
+              className="mt-4 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700"
+              onClick={() => {
+                setQrUser(null);
+                setQrImage("");
+              }}
+            >
+              Cerrar
+            </button>
+
+          </div>
+        </div>
+      )}
+
+
     </div>
   );
 }
