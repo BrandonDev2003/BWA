@@ -1,57 +1,103 @@
 import { NextRequest, NextResponse } from "next/server";
-import { randomInt } from "crypto";
-import nodemailer from "nodemailer";
+import jwt from "jsonwebtoken";
 
-function generarOtp(): string {
-  return String(randomInt(100000, 999999));
-}
+type OtpData = {
+  code: string;
+  expires: number;
+};
 
-// Función para enviar correo con Nodemailer
-async function enviarCorreoOtp(correo: string, otp: string) {
-  const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: Number(process.env.SMTP_PORT),
-    secure: true, // true para 465, false para otros puertos
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
-    },
-  });
-
-  await transporter.sendMail({
-    from: `"Gestión Leads" <${process.env.SMTP_USER}>`,
-    to: correo,
-    subject: "Tu código OTP para editar usuario",
-    text: `Tu código OTP es: ${otp}`,
-    html: `<p>Tu código OTP es: <b>${otp}</b></p>`,
-  });
+declare global {
+  var EDIT_OTPS: Record<string, OtpData>;
 }
 
 export async function POST(req: NextRequest) {
+
   try {
-    const otpCorreo = req.cookies.get("otp_correo")?.value;
-    if (!otpCorreo) {
+
+    const { otp } = await req.json();
+
+    if (!otp) {
       return NextResponse.json(
-        { ok: false, error: "Usuario no logeado o correo no encontrado" },
+        { ok: false, error: "OTP requerido" },
         { status: 400 }
       );
     }
 
-    const otp = generarOtp();
+    const token = req.cookies.get("token")?.value;
 
-    // Guardar OTP en memoria (temporal)
-    globalThis.EDIT_OTPS = globalThis.EDIT_OTPS || {};
-    globalThis.EDIT_OTPS[otpCorreo] = otp;
+    if (!token) {
+      return NextResponse.json(
+        { ok: false, error: "Usuario no logeado" },
+        { status: 401 }
+      );
+    }
 
-    // Enviar OTP por correo
-    await enviarCorreoOtp(otpCorreo, otp);
+    let payload: any;
 
-    return NextResponse.json({ ok: true, message: "OTP enviado al correo" });
-  } catch (err) {
-    console.error("send-edit-otp error:", err);
+    try {
+      payload = jwt.verify(token, process.env.JWT_SECRET!);
+    } catch {
+      return NextResponse.json(
+        { ok: false, error: "Token inválido" },
+        { status: 401 }
+      );
+    }
+
+    const correo = payload.correo;
+
+    if (!correo) {
+      return NextResponse.json(
+        { ok: false, error: "Correo no encontrado en token" },
+        { status: 400 }
+      );
+    }
+
+    if (!globalThis.EDIT_OTPS) {
+      globalThis.EDIT_OTPS = {};
+    }
+
+    const data = globalThis.EDIT_OTPS[correo];
+
+    if (!data) {
+      return NextResponse.json(
+        { ok: false, error: "OTP no encontrado" },
+        { status: 400 }
+      );
+    }
+
+    if (Date.now() > data.expires) {
+      delete globalThis.EDIT_OTPS[correo];
+
+      return NextResponse.json(
+        { ok: false, error: "OTP expirado" },
+        { status: 400 }
+      );
+    }
+
+    if (data.code !== otp) {
+      return NextResponse.json(
+        { ok: false, error: "OTP incorrecto" },
+        { status: 400 }
+      );
+    }
+
+    // OTP válido
+    delete globalThis.EDIT_OTPS[correo];
+
+    return NextResponse.json({
+      ok: true,
+      message: "OTP verificado correctamente"
+    });
+
+  } catch (error) {
+
+    console.error("verify-edit-otp error:", error);
+
     return NextResponse.json(
-      { ok: false, error: "Error enviando OTP" },
+      { ok: false, error: "Error verificando OTP" },
       { status: 500 }
     );
+
   }
+
 }
